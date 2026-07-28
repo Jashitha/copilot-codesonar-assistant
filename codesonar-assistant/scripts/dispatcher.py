@@ -38,6 +38,7 @@ from tools import (
 from entry_extractor import extract_filename, extract_issue_id
 from hotspot_analysis import hotspot_analysis
 from tracker_workflow_runner import run_tracker_workflow
+from precommit_review import run_precommit_review
 
 
 def dispatch(df, intent, query):
@@ -263,6 +264,8 @@ def dispatch(df, intent, query):
         return hotspot_analysis(df)
     elif intent == "tracker_workflow":
         return run_tracker_workflow(query)
+    elif intent == "precommit_review":
+        return run_precommit_review(query)
 
     else:
 

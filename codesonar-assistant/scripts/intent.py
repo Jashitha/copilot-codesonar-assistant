@@ -96,7 +96,7 @@ def detect_intent(query: str) -> str:
         return "recommend_next_issue"
 
     # "fix <id>" with no "issue" word — route to explain_issue for per-issue detail
-    if q.startswith("fix ") and any(ch.isdigit() for ch in q):
+    if q.startswith("fix ") and not q.startswith("fix guide") and any(ch.isdigit() for ch in q):
         return "explain_issue"
 
     # ==========================================================
@@ -106,7 +106,7 @@ def detect_intent(query: str) -> str:
     if (
         "explain issue" in q
         or "why is issue" in q
-        or (any(ch.isdigit() for ch in q) and ("explain" in q or "fix" in q or "issue" in q))
+        or (any(ch.isdigit() for ch in q) and ("explain" in q or "fix" in q or "issue" in q) and "fix guide" not in q)
     ):
         return "explain_issue"
 
@@ -274,6 +274,35 @@ def detect_intent(query: str) -> str:
         or "files with most issues" in q
     ):
         return "hotspot_analysis"
+    # ==========================================================
+    # MISRA Compliance
+    # ==========================================================
+
+    if (
+        "misra" in q
+        and (
+            "check" in q
+            or "review" in q
+            or "compliance" in q
+            or "validate" in q
+        )
+    ):
+        return "misra_checker"
+
+    # ==========================================================
+    # Pre Commit Review
+    # ==========================================================
+
+    if (
+        "review my code" in q
+        or "review code" in q
+        or "check my code" in q
+        or "pre commit review" in q
+        or "pre-commit review" in q
+        or "commit readiness" in q
+        or q.startswith("review ")
+    ):
+        return "precommit_review"
 
     # ==========================================================
     # Default Search

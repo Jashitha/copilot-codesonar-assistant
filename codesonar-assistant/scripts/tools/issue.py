@@ -436,9 +436,8 @@ def fix_guide_class(df, query: str) -> dict:
 def fix_guide_issue(df, query: str) -> dict:
     """Level-2 Fix Guide: per-issue detail — file, line, procedure, likely cause, checklist."""
 
-    m = re.search(r"(\d{5,})", query)   # CodeSonar IDs tend to be long numbers
-    if not m:
-        m = re.search(r"(\d+)", query)
+    # Accept full CodeSonar IDs, including decimal-form IDs like 1201340.7557926828
+    m = re.search(r"(\d+(?:\.\d+)?)", query)
 
     if not m:
         return {

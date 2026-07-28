@@ -46,9 +46,13 @@ Recommends high-priority pending issue based on priority and impact.
 
 ## Fix Guide
 
-Query examples:
+Class-level query examples:
 - `How to fix Use After Free`
 - `How to fix Inappropriate Assignment Type`
+
+Issue-level query examples:
+- `Fix Guide 1201340.7557926828`
+- `Fix Guide for Issue 6253372`
 
 Returns:
 - Why the class is reported
@@ -58,9 +62,24 @@ Returns:
 - Relevant standards
 - Tracker hotspots
 
-## Batch Fix Plan
+## Batch Fix Guide
 
-Query example:
-- `Batch Fix Plan for Use of strcpy`
+Query examples:
+- `Batch Fix Guide`
+- `Where should I focus for biggest impact?`
 
-Returns class/file hotspots and a prioritized plan to maximize finding reduction.
+Returns top class/file hotspots and a prioritized execution order to maximize finding reduction.
+
+## Pre-Commit Review
+
+Query examples:
+- `review tests/sample_code/dangerous_api.c`
+- `pre-commit review /absolute/path/to/file.c`
+- `check my code bsmd.c`
+- `commit readiness bsmd.c`
+
+Returns:
+- Findings grouped by checker
+- Line, severity, message, and recommendation
+- Summary counts per checker
+- Commit readiness (`READY TO COMMIT` or `NOT READY`)

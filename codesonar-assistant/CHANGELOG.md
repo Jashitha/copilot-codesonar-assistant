@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 - 2026-07-28
+
+- Added Pre-Commit Review workflow with query routing (`review`, `pre-commit review`, `check my code`, `commit readiness`)
+- Added modular checker pipeline for pre-commit scans (Dangerous API, MISRA-C:2012, CodeSonar-mapped patterns, Memory placeholder)
+- Added path resolution fallback for review queries across `scripts/`, `codesonar-assistant/`, and workspace root
+- Fixed `fix guide <issue id>` intent routing and decimal issue ID support
+- Updated docs and examples for Fix Guide and Pre-Commit Review
+
 ## 0.3.0 - 2026-07-27
 
 - Added tracker history output (`output/Tracker_History.xlsx`)

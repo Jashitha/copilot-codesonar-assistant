@@ -12,5 +12,11 @@
 - How to fix Use After Free
 - How to fix Inappropriate Assignment Type
 - How to fix Use of strcpy
-- Batch Fix Plan for Use of strcpy
+- Fix Guide 1201340.7557926828
+- Batch Fix Guide
+- Where should I focus for biggest impact?
+- review tests/sample_code/dangerous_api.c
+- pre-commit review /absolute/path/to/file.c
+- check my code bsmd.c
+- commit readiness bsmd.c
 - Update Tracker

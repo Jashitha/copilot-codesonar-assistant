@@ -34,11 +34,21 @@ Provides fix guidance for CodeSonar findings, including:
 
 - Class-level Fix Guide
 - Issue-level Fix Guide
-- Batch Fix Plan
+- Batch Fix Guide
 - Common causes
 - Risk explanation
 - Recommended remediation
 - High-impact procedures/files to prioritize
+
+### Pre-Commit Code Review
+Review source files before commit using built-in checkers:
+
+- Dangerous API checker
+- MISRA-C:2012 checker
+- CodeSonar-mapped pattern checker
+- Memory checker (placeholder when no rules are returned)
+
+Returns grouped findings with line, severity, message, recommendation, summary counts, and commit readiness.
 
 ## Folder Structure
 
@@ -138,8 +148,16 @@ python3 scripts/codesonar_assistant.py \
 - How to fix Inappropriate Assignment Type
 - How to fix Use After Free
 - How to fix Use of strcpy
+- Fix Guide 1201340.7557926828
 - Batch Fix Guide
 - Where should I focus for biggest impact?
+
+### Pre-Commit Review
+
+- review tests/sample_code/dangerous_api.c
+- pre-commit review /absolute/path/to/file.c
+- check my code bsmd.c
+- commit readiness bsmd.c
 
 ## Output Files
 

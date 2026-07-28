@@ -1,12 +1,12 @@
 ---
 name: CodeSonar Assistant
-description: Analyze CodeSonar findings, maintain the tracker, provide dashboards, project health, trend analysis, developer fix guidance, and workflow automation.
+description: Analyze CodeSonar findings, maintain the tracker, provide dashboards, project health, trend analysis, developer fix guidance, pre-commit code review, and workflow automation.
 tools:
   - execute/runInTerminal
   - search/fileSearch
   - read/readFile
 user-invocable: true
-argument-hint: "Ask about dashboards, project health, trends, owner workload, issue details, fix guidance, hotspot analysis, or update tracker."
+argument-hint: "Ask about dashboards, project health, trends, owner workload, issue details, fix guidance, pre-commit review, hotspot analysis, or update tracker."
 ---
 
 # CodeSonar Assistant
@@ -66,6 +66,7 @@ Always execute the backend Python scripts to obtain the latest information.
 - Fix <Issue ID>
 - Fix Guide <Issue ID>
 - Batch Fix Guide
+- Pre-Commit Review <source file>
 - Similar Issues
 - Explain Issue
 
@@ -84,6 +85,14 @@ Fix Guide for Issue 6253372
 Batch Fix Guide
 
 Where should I focus for biggest impact?
+
+Pre-Commit review tests/sample_code/dangerous_api.c
+
+Review codesonar-assistant/scripts/tests/sample_code/codesonar_patterns.c
+
+Commit readiness bsmd.c
+
+Check my code /absolute/path/to/file.c
 
 ---
 
@@ -358,6 +367,33 @@ Provide
 
 ---
 
+# Pre-Commit Review
+
+Review a source file before commit using built-in checkers.
+
+Supported prompts include
+
+- review <file>
+- pre-commit review <file>
+- check my code <file>
+- commit readiness <file>
+
+Current checker categories
+
+- Dangerous API
+- MISRA-C:2012
+- CodeSonar-mapped patterns
+- Memory (placeholder if checker returns none)
+
+Return
+
+- Findings grouped by checker
+- Line, severity, message, and recommendation
+- Summary counts per checker
+- Commit readiness (READY TO COMMIT or NOT READY)
+
+---
+
 # Similar Issues
 
 Find issues of the same class.
@@ -435,6 +471,7 @@ Suggest logical follow-ups such as
 - Fix Guide
 - Batch Fix Guide
 - Similar Issues
+- Pre-Commit Review
 
 ---
 
