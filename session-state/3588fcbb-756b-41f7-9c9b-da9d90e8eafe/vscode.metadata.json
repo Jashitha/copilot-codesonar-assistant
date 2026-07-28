@@ -1,0 +1,18 @@
+{
+  "origin": "vscode",
+  "workspaceFolder": {
+    "folderPath": "/data/home/jkunhiparamb/work/v2x-build/src/foss/protobuf/third_party/benchmark",
+    "timestamp": 1783946461135
+  },
+  "modified": 1785134305343,
+  "created": 1783945336413,
+  "repositoryProperties": {
+    "repositoryPath": "/data/home/jkunhiparamb/work/v2x-build/src/foss/protobuf/third_party/benchmark",
+    "baseCommit": "360e66c1c4777c99402cf8cd535aa510fee16573",
+    "hasGitHubRemote": true,
+    "incomingChanges": 0,
+    "outgoingChanges": 0,
+    "uncommittedChanges": 0
+  },
+  "firstUserMessage": "pahole executable download linux"
+}
