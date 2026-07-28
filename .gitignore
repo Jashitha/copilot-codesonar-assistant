@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.vscode/
+
+ide/
+session-state/
+vscode.session.metadata.cache.json
+
+codesonar-assistant/output/*
+!codesonar-assistant/output/.gitkeep
+codesonar-assistant/data/*.csv
+codesonar-assistant/*.xlsx
