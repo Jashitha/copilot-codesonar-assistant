@@ -83,3 +83,19 @@ Returns:
 - Line, severity, message, and recommendation
 - Summary counts per checker
 - Commit readiness (`READY TO COMMIT` or `NOT READY`)
+
+## Gerrit Review
+
+Query examples:
+- `Gerrit patchset review https://gerrit.example.com/c/project/+/123/4`
+- `Gerrit gate patchset-created https://gerrit.example.com/c/project/+/123/4`
+
+Returns a Gerrit review summary for the pasted link and posts a `Verified -1`
+vote when HIGH severity findings remain.
+
+## Auto Fix
+
+Query examples:
+- `Auto Fix tests/sample_code/dangerous_api.c`
+
+Applies safe mechanical fixes where possible, then reruns the pre-commit review.

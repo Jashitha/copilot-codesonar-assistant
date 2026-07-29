@@ -19,4 +19,7 @@
 - pre-commit review /absolute/path/to/file.c
 - check my code bsmd.c
 - commit readiness bsmd.c
+- Auto Fix tests/sample_code/dangerous_api.c
+- Gerrit patchset review https://gerrit.example.com/c/project/+/123/4
+- Gerrit gate patchset-created https://gerrit.example.com/c/project/+/123/4
 - Update Tracker

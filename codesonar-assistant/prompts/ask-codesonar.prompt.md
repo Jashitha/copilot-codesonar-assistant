@@ -5,7 +5,7 @@ description: Ask natural-language questions about CodeSonar findings and tracker
 
 Answer this CodeSonar question using installed tracker/CSV data:
 
-Question: ${input:question:Ask about owner workload, pending issues, class distribution, priority split, or specific IDs}
+Question: ${input:question:Ask about owner workload, pending issues, class distribution, priority split, Gerrit review links, or specific IDs}
 
 Steps:
 1. Invoke `@CodeSonar-Assistant` with the question.

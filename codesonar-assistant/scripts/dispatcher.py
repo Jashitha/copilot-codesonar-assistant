@@ -39,6 +39,8 @@ from entry_extractor import extract_filename, extract_issue_id
 from hotspot_analysis import hotspot_analysis
 from tracker_workflow_runner import run_tracker_workflow
 from precommit_review import run_precommit_review
+from auto_fix import run_auto_fix
+from gerrit_review import run_gerrit_review
 
 
 def dispatch(df, intent, query):
@@ -126,6 +128,12 @@ def dispatch(df, intent, query):
 
     elif intent == "fix_guide_batch":
         return fix_guide_batch(df)
+
+    elif intent == "auto_fix":
+        return run_auto_fix(query)
+
+    elif intent == "gerrit_review":
+        return run_gerrit_review(query)
 
     elif intent == "similar_issues":
         return similar_issues(df, query)

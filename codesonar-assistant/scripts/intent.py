@@ -10,6 +10,20 @@ def detect_intent(query: str) -> str:
     q = query.lower()
 
     # ==========================================================
+    # Gerrit Review / Gate
+    # ==========================================================
+
+    if (
+        "gerrit" in q
+        or "patchset-created" in q
+        or "patchset review" in q
+        or "gerrit review" in q
+        or "gerrit gate" in q
+        or (("http://" in q or "https://" in q) and ("/c/" in q or "gerrit" in q))
+    ):
+        return "gerrit_review"
+
+    # ==========================================================
     # Analytics
     # ==========================================================
 
@@ -167,6 +181,14 @@ def detect_intent(query: str) -> str:
     # ==========================================================
     # Fix Recommendation (legacy simple lookup)
     # ==========================================================
+
+    if (
+        "auto fix" in q
+        or "autofix" in q
+        or "fix automatically" in q
+        or "apply fix" in q
+    ):
+        return "auto_fix"
 
     if (
         "how do i fix" in q

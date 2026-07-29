@@ -1,6 +1,18 @@
 # CodeSonar Assistant
 
-CodeSonar Assistant is an AI-powered GitHub Copilot agent that simplifies daily CodeSonar analysis and tracker management. It automates repetitive tasks such as downloading reports, updating trackers, generating dashboards, preserving assignments, and answering natural language queries about CodeSonar findings.
+CodeSonar Assistant is a generic AI-powered GitHub Copilot agent for CodeSonar analysis and tracker management. Point it at your own project by setting the CodeSonar report URL and credentials in `.env`; it will download the latest report, update the tracker, generate dashboards, preserve assignments, auto-fix safe source patterns, and answer natural language queries about CodeSonar findings.
+
+When used as a reusable team assistant, it prioritizes these workflows in order:
+
+1. HB_PRIO_1 / HB_PRIO_2 filtering
+2. Root cause explanation
+3. Suggested fix with code example
+4. MISRA rule mapping
+5. CWE mapping
+6. CERT-C mapping
+7. AUTOSAR mapping for C++ projects only
+8. Pre-commit code review for new changes
+9. Automatic summary report generation
 
 ## Key Features
 
@@ -35,6 +47,13 @@ Provides fix guidance for CodeSonar findings, including:
 - Class-level Fix Guide
 - Issue-level Fix Guide
 - Batch Fix Guide
+- Auto-Fix for safe mechanical edits
+- Root cause explanation
+- Suggested fix with code example
+- MISRA rule mapping
+- CWE mapping
+- CERT-C mapping
+- AUTOSAR mapping for C++ projects only
 - Common causes
 - Risk explanation
 - Recommended remediation
@@ -49,6 +68,32 @@ Review source files before commit using built-in checkers:
 - Memory checker (placeholder when no rules are returned)
 
 Returns grouped findings with line, severity, message, recommendation, summary counts, and commit readiness.
+
+### Automatic Summary Reports
+The assistant can generate concise summary reports for teams that emphasize:
+
+- Total issues and high-priority filters
+- Root cause summary
+- Suggested remediation summary
+- Standards mapping summary when available
+- Files and classes that carry the highest impact
+
+### Gerrit Integration
+The assistant can also run as a Gerrit patchset listener and gate reviews automatically:
+
+- Watches `patchset-created` events from Gerrit SSH stream-events
+- Reviews changed `.c` and `.h` files using the existing pre-commit checkers
+- Posts inline comments back to Gerrit for HIGH severity findings
+- Casts `Verified -1` when HIGH severity findings are present
+- Casts `Verified +1` when the patchset is clean
+- Supports an auto-fix workflow for safe mechanical changes before manual review
+
+### Auto-Fix
+For safe mechanical issues, the assistant can apply direct fixes before re-running review:
+
+- `strcpy(dst, src)` -> `snprintf(dst, sizeof(dst), "%s", src)`
+- `sprintf(dst, ...)` -> `snprintf(dst, sizeof(dst), ...)`
+- obvious null-check-after-dereference reorderings
 
 ## Folder Structure
 
@@ -90,13 +135,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Configure environment variables.
+4. Configure environment variables for your project.
 
 ```bash
 cp .env.example .env
 ```
 
-Update the CodeSonar URL and credentials in `.env`.
+Set `CODESONAR_REPORT_URL`, `CODESONAR_USERNAME`, and `CODESONAR_PASSWORD` (or the supported token/cookie values) for your CodeSonar project in `.env`.
 
 5. Run the assistant.
 
@@ -140,8 +185,8 @@ python3 scripts/codesonar_assistant.py \
 
 - Issue 6253372
 - Explain Issue 6253372
-- Show Issues in bsmd.c
-- Show HB_PRIO_1 Issues
+- Show issues in <file>
+- Show HB_PRIO_1 issues
 
 ### Fix Guidance
 
@@ -150,14 +195,26 @@ python3 scripts/codesonar_assistant.py \
 - How to fix Use of strcpy
 - Fix Guide 1201340.7557926828
 - Batch Fix Guide
+- Auto Fix <source file>
 - Where should I focus for biggest impact?
+- Show root cause for issue 1201340.7557926828
+- Show suggested fix with code example
+- Show CWE and CERT-C mapping for Use After Free
 
 ### Pre-Commit Review
 
-- review tests/sample_code/dangerous_api.c
-- pre-commit review /absolute/path/to/file.c
-- check my code bsmd.c
-- commit readiness bsmd.c
+- review <source file>
+- pre-commit review <source file>
+- check my code <source file>
+- commit readiness <source file>
+
+### Gerrit / Auto-Fix
+
+- auto fix <source file>
+- Gerrit patchset review <gerrit link>
+- Gerrit gate patchset-created <gerrit link>
+
+Paste a Gerrit URL to review that patchset and gate it with CodeSonar findings.
 
 ## Output Files
 
@@ -174,6 +231,8 @@ The assistant automatically generates:
 - Provides instant project health and dashboard metrics
 - Helps prioritize high-risk findings
 - Explains CodeSonar findings with recommended fixes
+- Applies safe auto-fixes for common patterns
+- Can block Gerrit patchsets with Verified -1 when HIGH severity findings remain
 - Enables natural language interaction with CodeSonar data through GitHub Copilot
 
 ## License
