@@ -29,12 +29,18 @@ def _extract_metrics(df: pd.DataFrame) -> dict[str, int]:
 def _build_dashboard_tables(df: pd.DataFrame):
     metrics = _extract_metrics(df)
 
-    owners = (
-        df.groupby("Owner")
-        .size()
-        .reset_index(name="Assigned")
-        .sort_values("Assigned", ascending=False)
-    )
+    def _grouped_counts(column: str, value_name: str = "Assigned") -> pd.DataFrame:
+        if column not in df.columns:
+            return pd.DataFrame(columns=[column, value_name])
+        return (
+            df.groupby(column)
+            .size()
+            .reset_index(name=value_name)
+            .sort_values(value_name, ascending=False)
+        )
+
+    owners = _grouped_counts("Owner")
+    reviewers = _grouped_counts("Reviewer")
 
     files = (
         df.groupby("file")
@@ -66,6 +72,7 @@ def _build_dashboard_tables(df: pd.DataFrame):
         {"Metric": "HB_PRIO_1", "Value": metrics["HB_PRIO_1"]},
         {"Metric": "HB_PRIO_2", "Value": metrics["HB_PRIO_2"]},
         {"Metric": "Owners", "Value": len(owners)},
+        {"Metric": "Reviewers", "Value": len(reviewers)},
         {},
         {"Top Files": "", "Issues": ""},
         *files.to_dict("records"),
@@ -74,7 +81,7 @@ def _build_dashboard_tables(df: pd.DataFrame):
         *top_classes.rename(columns={"class": "Top Class"}).to_dict("records"),
     ]
 
-    # Rows returned to chat output (includes owners + top classes)
+    # Rows returned to chat output (includes owners + reviewers + top classes)
     rows_for_chat = [
         {"Metric": "Total Issues", "Value": metrics["Total Issues"]},
         {"Metric": "Pending", "Value": metrics["Pending"]},
@@ -82,9 +89,13 @@ def _build_dashboard_tables(df: pd.DataFrame):
         {"Metric": "HB_PRIO_1", "Value": metrics["HB_PRIO_1"]},
         {"Metric": "HB_PRIO_2", "Value": metrics["HB_PRIO_2"]},
         {"Metric": "Owners", "Value": len(owners)},
+        {"Metric": "Reviewers", "Value": len(reviewers)},
         {},
         {"Top Owners": ""},
         *owners.to_dict("records"),
+        {},
+        {"Top Reviewers": ""},
+        *reviewers.to_dict("records"),
         {},
         {"Top Files": ""},
         *files.to_dict("records"),

@@ -426,7 +426,7 @@ Update Tracker performs
 
 - Master_Tracker.xlsx — exactly two sheets:
   - Summary: Overall Metrics, Top 5 Files, Top 5 Issue Classes, Complete Issue Class Distribution
-  - Details: every HB_PRIO_1/HB_PRIO_2 issue (score, id, class, significance, file, line number, procedure, priority, state, finding, owner, url)
+  - Details: every HB_PRIO_1/HB_PRIO_2 issue (score, id, class, significance, file, line number, procedure, priority, state, finding, owner, reviewer, url)
 - Tracker_History.xlsx
 - Timestamped Master_Tracker snapshot (same two sheets)
 

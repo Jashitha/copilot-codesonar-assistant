@@ -37,6 +37,7 @@ DETAILS_COLUMNS = [
     "state",
     "finding",
     "owner",
+    "reviewer",
     "url",
 ]
 
@@ -50,9 +51,10 @@ def _blank_owner_mask(series: pd.Series) -> pd.Series:
 
 
 def _metric_rows(df: pd.DataFrame) -> list[tuple[str, int]]:
-    """Overall Metrics: Total Issues, Pending, Done, HB_PRIO_1, HB_PRIO_2, Owners."""
+    """Overall Metrics: Total Issues, Pending, Done, HB_PRIO_1, HB_PRIO_2, Owners, Reviewers."""
     status_col = "Status" if "Status" in df.columns else "state"
     owner_col = "Owner" if "Owner" in df.columns else "owner"
+    reviewer_col = "Reviewer" if "Reviewer" in df.columns else "reviewer"
 
     status = (
         df[status_col].astype(str).str.lower()
@@ -73,6 +75,12 @@ def _metric_rows(df: pd.DataFrame) -> list[tuple[str, int]]:
     else:
         owner_count = 0
 
+    if reviewer_col in df.columns:
+        reviewers = df.loc[~_blank_owner_mask(df[reviewer_col]), reviewer_col].astype(str).str.strip()
+        reviewer_count = reviewers.nunique()
+    else:
+        reviewer_count = 0
+
     return [
         ("Total Issues", total),
         ("Pending", pending),
@@ -80,6 +88,7 @@ def _metric_rows(df: pd.DataFrame) -> list[tuple[str, int]]:
         ("HB_PRIO_1", hb1),
         ("HB_PRIO_2", hb2),
         ("Owners", owner_count),
+        ("Reviewers", reviewer_count),
     ]
 
 
@@ -98,6 +107,22 @@ def _class_distribution(df: pd.DataFrame) -> list[tuple[str, int]]:
     if "class" not in df.columns:
         return []
     counts = df.groupby("class").size().sort_values(ascending=False)
+    return list(counts.items())
+
+
+def _workload(df: pd.DataFrame, primary_col: str, fallback_col: str) -> list[tuple[str, int]]:
+    """Issue count per assignee for the given column, sorted descending.
+
+    Blank/NaN/'unassigned'/'none' values collapse into a single 'Unassigned' row so the
+    split across real owners/reviewers is easy to read.
+    """
+    col = primary_col if primary_col in df.columns else fallback_col
+    if col not in df.columns:
+        return []
+
+    values = df[col].astype(str).str.strip()
+    values = values.mask(_blank_owner_mask(values), "Unassigned")
+    counts = values.value_counts()
     return list(counts.items())
 
 
@@ -160,6 +185,12 @@ def generate_summary_sheet(workbook: Workbook, dataframe: pd.DataFrame) -> Works
         ws, row, "Top Issue Classes", ["Top Issue Class", "Issues"], class_dist[:TOP_N]
     )
     row = _write_section(
+        ws, row, "Owner Workload", ["Owner", "Issues"], _workload(dataframe, "Owner", "owner")
+    )
+    row = _write_section(
+        ws, row, "Reviewer Workload", ["Reviewer", "Issues"], _workload(dataframe, "Reviewer", "reviewer")
+    )
+    row = _write_section(
         ws, row, "Complete Issue Class Distribution", ["Class", "Issues"], class_dist
     )
 
@@ -174,7 +205,9 @@ def generate_details_sheet(workbook: Workbook, dataframe: pd.DataFrame) -> Works
         del workbook["Details"]
     ws = workbook.create_sheet("Details")
 
-    details_df = dataframe.rename(columns={"Status": "state", "Owner": "owner"})
+    details_df = dataframe.rename(
+        columns={"Status": "state", "Owner": "owner", "Reviewer": "reviewer"}
+    )
     ordered = [c for c in DETAILS_COLUMNS if c in details_df.columns]
     details_df = details_df[ordered]
 

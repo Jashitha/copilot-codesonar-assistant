@@ -75,14 +75,21 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     if "state" in renamed.columns and "Status" not in renamed.columns:
         renamed["Status"] = renamed["state"].fillna("")
 
+    if "reviewer" in renamed.columns and "Reviewer" not in renamed.columns:
+        renamed["Reviewer"] = renamed["reviewer"].fillna("")
+
     if "Owner" not in renamed.columns:
         renamed["Owner"] = ""
 
     if "Status" not in renamed.columns:
         renamed["Status"] = ""
 
+    if "Reviewer" not in renamed.columns:
+        renamed["Reviewer"] = ""
+
     renamed["Owner"] = renamed["Owner"].astype(str)
     renamed["Status"] = renamed["Status"].astype(str)
+    renamed["Reviewer"] = renamed["Reviewer"].astype(str)
 
     return renamed
 
@@ -348,12 +355,12 @@ def main():
 
     source = None
     if intent == "dashboard":
-        dashboard_csv = TASK_DIR / "data" / "codesonar.csv"
+        dashboard_tracker = TASK_DIR / "output" / "Master_Tracker.xlsx"
         try:
             refresh_latest_codesonar_data_for_dashboard(args.query)
         except RuntimeError as exc:
             payload = {
-                "source": str(dashboard_csv),
+                "source": str(dashboard_tracker),
                 "answer": str(exc),
                 "count": 0,
                 "rows": [],
@@ -364,7 +371,8 @@ def main():
                 print(f"Source : {payload['source']}")
                 print(payload["answer"])
             return
-        df, source = load_input(str(dashboard_csv))
+        # Read the tracker (not the raw CSV) so Owner/Reviewer assignments are included.
+        df, source = load_input(str(dashboard_tracker))
     else:
         df, source = load_input(args.input)
 
