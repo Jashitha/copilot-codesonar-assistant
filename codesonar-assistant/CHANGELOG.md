@@ -7,6 +7,9 @@
 - Removed separate `Dashboard_Output.xlsx` generation; dashboard metrics are now read from Master_Tracker.xlsx
 - Updated `daily_workflow.py`, `tools/dashboard.py`, and `codesonar_assistant.py` to read the Details sheet explicitly for backward-compatible sheet ordering
 - Updated agent doc, READMEs, and Architecture.md to reflect the consolidated two-sheet tracker output
+- Added Gerrit patchset review and Gerrit gate support with pasted Gerrit link parsing and Verified vote posting
+- Added safe Auto Fix workflow with pre-commit review before and after mechanical remediation
+- Updated docs and prompts to describe the assistant as generic/project-specific via `.env` CodeSonar URL and credentials
 
 ## 0.4.0 - 2026-07-28
 

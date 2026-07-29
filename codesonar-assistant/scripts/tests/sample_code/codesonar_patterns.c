@@ -11,14 +11,14 @@
 void demo_strcpy(const char *src)
 {
     char dst[16];
-    strcpy(dst, src);          /* HIGH: no size validation */
+    snprintf(dst, sizeof(dst), "%s", src);          /* HIGH: no size validation */
 }
 
 /* Use of sprintf → CodeSonar: Use of sprintf, MISRA Rule 21.6 */
 void demo_sprintf(const char *user, const char *msg)
 {
     char buf[64];
-    sprintf(buf, "%s: %s", user, msg);   /* HIGH: no length limit */
+    snprintf(buf, sizeof(buf), "%s: %s", user, msg);   /* HIGH: no length limit */
 }
 
 /* Inappropriate Assignment Type → MISRA Rule 10.3 */
@@ -46,10 +46,10 @@ void demo_use_after_free(void)
 /* Null Test After Dereference → MISRA Rule 18.2 */
 void demo_null_after_deref(struct Node *node)
 {
-    int val = node->value;      /* dereference before null check */
     if (node == NULL) {         /* HIGH: null check too late */
         return;
     }
+    int val = node->value;      /* dereference before null check */
     (void)val;
 }
 

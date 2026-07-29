@@ -428,6 +428,35 @@ Return
 
 ---
 
+# Auto Fix
+
+Supported prompts
+
+- Auto Fix <source file>
+
+Workflow
+
+1. Run a pre-commit review on the source file.
+2. Identify findings that support automatic remediation.
+3. Apply only safe, predefined mechanical fixes.
+4. Save the updated source file.
+5. Run the pre-commit review again.
+6. Present a before/after comparison.
+
+Return
+
+- Findings before Auto Fix
+- Fixes applied
+- Findings after Auto Fix
+- Remaining findings
+- Commit readiness
+
+Only modify findings that have built-in Auto Fix support.
+Never generate arbitrary code changes.
+If a finding cannot be fixed automatically, explain why and provide manual fix guidance.
+
+---
+
 # Similar Issues
 
 Find issues of the same class.

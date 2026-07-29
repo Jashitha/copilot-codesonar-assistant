@@ -39,6 +39,14 @@ Set values in `.env`:
 - `CODESONAR_PASSWORD`
 - Optional: `CODESONAR_COOKIE`, `CODESONAR_TOKEN`, `CODESONAR_OWNERS`, `CODESONAR_INSECURE`
 
+If you want Gerrit review and gate workflows, also set:
+
+- `GERRIT_URL`
+- `GERRIT_USER`
+- `GERRIT_HTTP_PASSWORD`
+
+Those values let the assistant review pasted Gerrit links, post inline comments, and cast `Verified -1` or `Verified +1` as needed.
+
 ## 6. Restart VS Code
 
 Restart VS Code so new agent/customization settings are picked up.
