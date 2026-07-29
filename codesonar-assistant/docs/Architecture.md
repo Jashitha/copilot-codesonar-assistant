@@ -16,6 +16,8 @@
   - Preserves assignment/review state while syncing findings
 - `scripts/parser.py`
   - Normalizes CodeSonar CSV columns
+- `scripts/report_generator.py`
+  - Builds the Summary and Details sheets and saves the tracker workbook
 
 ## Data Flow
 
@@ -26,7 +28,6 @@
 
 ## Outputs
 
-- `output/Master_Tracker.xlsx`
-- `output/Master_Tracker_YYYYMMDD.xlsx`
-- `output/Dashboard_Output.xlsx`
+- `output/Master_Tracker.xlsx` (Summary + Details sheets)
+- `output/Master_Tracker_YYYYMMDD.xlsx` (Summary + Details sheets)
 - `output/Tracker_History.xlsx`

@@ -190,8 +190,7 @@ Dashboard automatically performs
 5. Assign new issues when owner/reviewer pools are configured
 6. Generate
 
-- Master_Tracker.xlsx
-- Dashboard_Output.xlsx
+- Master_Tracker.xlsx (Summary + Details sheets)
 - Tracker_History.xlsx
 
 Return dashboard metrics from the refreshed tracker.
@@ -425,10 +424,11 @@ Update Tracker performs
 5. Assign new issues
 6. Generate
 
-- Master_Tracker.xlsx
-- Dashboard_Output.xlsx
+- Master_Tracker.xlsx — exactly two sheets:
+  - Summary: Overall Metrics, Top 5 Files, Top 5 Issue Classes, Complete Issue Class Distribution
+  - Details: every HB_PRIO_1/HB_PRIO_2 issue (score, id, class, significance, file, line number, procedure, priority, state, finding, owner, url)
 - Tracker_History.xlsx
-- Timestamped snapshots
+- Timestamped Master_Tracker snapshot (same two sheets)
 
 Return a workflow summary.
 

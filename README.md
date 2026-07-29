@@ -163,11 +163,9 @@ python3 scripts/codesonar_assistant.py \
 
 The assistant automatically generates:
 
-- Master_Tracker.xlsx
-- Dashboard_Output.xlsx
+- Master_Tracker.xlsx (two sheets: Summary + Details)
 - Tracker_History.xlsx
-- Timestamped tracker snapshots
-- Timestamped dashboard snapshots
+- Timestamped tracker snapshots (same two-sheet structure)
 
 ## Benefits
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 - 2026-07-29
+
+- Added `scripts/report_generator.py` with `generate_summary_sheet`, `generate_details_sheet`, and `save_tracker_report`
+- Master_Tracker.xlsx now contains exactly two sheets: Summary (Overall Metrics, Top Files, Top Issue Classes, Complete Issue Class Distribution) and Details (full issue list with exact column order)
+- Removed separate `Dashboard_Output.xlsx` generation; dashboard metrics are now read from Master_Tracker.xlsx
+- Updated `daily_workflow.py`, `tools/dashboard.py`, and `codesonar_assistant.py` to read the Details sheet explicitly for backward-compatible sheet ordering
+- Updated agent doc, READMEs, and Architecture.md to reflect the consolidated two-sheet tracker output
+
 ## 0.4.0 - 2026-07-28
 
 - Added Pre-Commit Review workflow with query routing (`review`, `pre-commit review`, `check my code`, `commit readiness`)

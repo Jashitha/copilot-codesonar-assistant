@@ -96,7 +96,11 @@ def load_input(input_file: str):
 
     if path.suffix.lower() == ".xlsx":
 
-        df = pd.read_excel(path, dtype={"id": str})
+        try:
+            df = pd.read_excel(path, sheet_name="Details", dtype={"id": str})
+        except ValueError:
+            # Legacy workbook without a Details sheet name.
+            df = pd.read_excel(path, dtype={"id": str})
 
         return normalize_columns(df), str(path)
 

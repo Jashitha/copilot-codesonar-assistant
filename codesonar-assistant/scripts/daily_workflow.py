@@ -28,6 +28,7 @@ import requests
 
 from filters import filter_high_priority
 from parser import read_codesonar_report
+from report_generator import save_tracker_report
 from sync import sync_tracker
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -442,6 +443,22 @@ def _ensure_columns(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def _read_master_tracker(tracker_path: Path) -> pd.DataFrame:
+    """Read back the tracker's Details sheet and normalize columns for sync."""
+    try:
+        master_df = pd.read_excel(tracker_path, sheet_name="Details", dtype={"id": str})
+    except ValueError:
+        # Older/legacy workbook without a Details sheet name.
+        master_df = pd.read_excel(tracker_path, dtype={"id": str})
+
+    if "owner" in master_df.columns and "Owner" not in master_df.columns:
+        master_df = master_df.rename(columns={"owner": "Owner"})
+    if "state" in master_df.columns and "Status" not in master_df.columns:
+        master_df = master_df.rename(columns={"state": "Status"})
+
+    return master_df
+
+
 def update_tracker_history(
     df: pd.DataFrame,
     new_count: int,
@@ -495,8 +512,6 @@ def _print_summary(
     archive_csv: Path,
     tracker_path: Path,
     daily_tracker: Path,
-    dashboard_path: Path | None,
-    daily_dashboard: Path | None,
     history_path: Path | None = None,
 ) -> None:
     hb1 = int((df["priority"] == "HB_PRIO_1").sum()) if "priority" in df.columns else 0
@@ -545,7 +560,7 @@ def _print_summary(
     print()
     print("  Generated Files")
     print(f"  {SEP}")
-    for path in [tracker_path, daily_tracker, dashboard_path, daily_dashboard, history_path]:
+    for path in [tracker_path, daily_tracker, history_path]:
         if path and path.exists():
             print(f"  ✓ {path.relative_to(TASK_DIR)}")
         elif path:
@@ -604,7 +619,7 @@ def run_daily_workflow(args: argparse.Namespace) -> int:
     owners_preserved         = 0
 
     if tracker_path.exists():
-        master_df = pd.read_excel(tracker_path, dtype={"id": str})
+        master_df = _read_master_tracker(tracker_path)
         master_df = _ensure_columns(master_df)
 
         latest_df["id"]  = latest_df["id"].astype(str).str.strip()
@@ -671,9 +686,9 @@ def run_daily_workflow(args: argparse.Namespace) -> int:
         resolved_count = 0
         owners_preserved = 0
 
-    # ── Save tracker ──────────────────────────────────────────────────────────
-    final_df.to_excel(tracker_path, index=False)
-    final_df.to_excel(daily_tracker, index=False)
+    # ── Save tracker (Summary + Details sheets) ─────────────────────────────
+    save_tracker_report(final_df, tracker_path)
+    save_tracker_report(final_df, daily_tracker)
 
     # ── History ───────────────────────────────────────────────────────────────
     history_path: Path | None = None
@@ -685,24 +700,6 @@ def run_daily_workflow(args: argparse.Namespace) -> int:
         )
     except Exception as exc:
         print(f"[warn] Tracker history update skipped: {exc}")
-
-    # ── Dashboard ─────────────────────────────────────────────────────────────
-    dashboard_path  = None
-    daily_dashboard = None
-    try:
-        import sys as _sys
-        _sys.path.insert(0, str(SCRIPT_DIR / "tools"))
-        from dashboard import dashboard as _dashboard
-        dash_result = _dashboard(final_df)
-        dash_rows = dash_result.get("rows", []) if isinstance(dash_result, dict) else dash_result
-        for row in dash_rows:
-            if isinstance(row, dict):
-                if "Dashboard Excel" in row:
-                    dashboard_path = Path(row["Dashboard Excel"])
-                if "Dashboard Excel Snapshot" in row:
-                    daily_dashboard = Path(row["Dashboard Excel Snapshot"])
-    except Exception as exc:
-        print(f"[warn] Dashboard generation skipped: {exc}")
 
     # ── Rich summary ──────────────────────────────────────────────────────────
     _print_summary(
@@ -717,8 +714,6 @@ def run_daily_workflow(args: argparse.Namespace) -> int:
         archive_csv=archive_csv,
         tracker_path=tracker_path,
         daily_tracker=daily_tracker,
-        dashboard_path=dashboard_path,
-        daily_dashboard=daily_dashboard,
         history_path=history_path,
     )
     return 0
