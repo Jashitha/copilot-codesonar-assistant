@@ -47,6 +47,11 @@ If you want Gerrit review and gate workflows, also set:
 
 Those values let the assistant review pasted Gerrit links, post inline comments, and cast `Verified -1` or `Verified +1` as needed.
 
+The assistant is project-generic and supports both C and C++ CodeSonar projects.
+
+- Offline mode uses an exported CodeSonar CSV or an existing tracker as input.
+- Live mode connects to a CodeSonar server through the `.env` settings above.
+
 ## 6. Restart VS Code
 
 Restart VS Code so new agent/customization settings are picked up.

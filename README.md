@@ -1,6 +1,11 @@
 # CodeSonar Assistant
 
-CodeSonar Assistant is a generic AI-powered GitHub Copilot agent for CodeSonar analysis and tracker management. Point it at your own project by setting the CodeSonar report URL and credentials in `.env`; it will download the latest report, update the tracker, generate dashboards, preserve assignments, auto-fix safe source patterns, and answer natural language queries about CodeSonar findings.
+CodeSonar Assistant is a project-generic AI-powered GitHub Copilot agent for CodeSonar analysis and tracker management. It supports both C and C++ CodeSonar projects and can run in two modes:
+
+- Offline mode using an exported CodeSonar CSV or an existing tracker
+- Live mode by connecting to a CodeSonar server through configurable `.env` settings
+
+Point it at your own project and it will download the latest report, update the tracker, generate dashboards, preserve assignments, auto-fix safe source patterns, and answer natural language queries about CodeSonar findings.
 
 When used as a reusable team assistant, it prioritizes these workflows in order:
 
@@ -141,7 +146,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `CODESONAR_REPORT_URL`, `CODESONAR_USERNAME`, and `CODESONAR_PASSWORD` (or the supported token/cookie values) for your CodeSonar project in `.env`.
+Set `CODESONAR_REPORT_URL`, `CODESONAR_USERNAME`, and `CODESONAR_PASSWORD` (or the supported token/cookie values) in `.env` for live mode. For offline mode, provide an exported CSV or existing tracker as the input.
 
 5. Run the assistant.
 
