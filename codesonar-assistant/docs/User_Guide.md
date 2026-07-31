@@ -20,6 +20,23 @@ Runs the daily workflow:
 - Assigns new issues
 - Generates tracker and dashboard outputs
 
+If you are setting up live mode, use a direct CodeSonar report or CSV export URL in `CODESONAR_REPORT_URL`. The assistant treats that value as the download endpoint for report data, not as a login page.
+
+Suggested starter prompts:
+- `Update Tracker`
+- `Dashboard`
+- `Project Health`
+
+Offline mode setup:
+1. Export a CodeSonar CSV or use an existing tracker workbook.
+2. Pass the local file path with the query or use the default input file.
+3. Run `Update Tracker` or `Dashboard` against the local data.
+
+Live mode setup:
+1. Set `CODESONAR_REPORT_URL` to the report or CSV export endpoint.
+2. Provide `CODESONAR_USERNAME` and `CODESONAR_PASSWORD`, or token/cookie values.
+3. Run `Update Tracker` to download fresh data.
+
 ## Project Health
 
 Query: `Project Health`
@@ -49,6 +66,8 @@ Recommends high-priority pending issue based on priority and impact.
 Class-level query examples:
 - `How to fix Use After Free`
 - `How to fix Inappropriate Assignment Type`
+- `Fix Guide for Rule 21.6`
+- `Fix Guide for file1.c`
 
 Issue-level query examples:
 - `Fix Guide 1201340.7557926828`
@@ -61,6 +80,11 @@ Returns:
 - Verification checklist
 - Relevant standards
 - Tracker hotspots
+
+Good follow-up prompts:
+- `Batch Fix Guide`
+- `Where should I focus for biggest impact?`
+- `Auto Fix tests/sample_code/dangerous_api.c`
 
 ## Batch Fix Guide
 
@@ -106,6 +130,8 @@ Returns:
 - Summary counts per checker
 - Commit readiness (`READY TO COMMIT` or `NOT READY`)
 
+If you are unsure what to type first, start with `Update Tracker` for live/offline data refresh or `Dashboard` for the summary view.
+
 ## Gerrit Patchset Review
 
 Query examples:
@@ -114,6 +140,8 @@ Query examples:
 
 Returns a Gerrit review summary for the pasted link, downloads reviewable file contents from Gerrit, runs the Review Engine, and posts a `Verified -1`
 vote when blocking findings remain.
+
+The Gerrit review output now includes a Blocking Files section so the result is actionable without having to inspect each source file separately.
 
 ## Auto Fix
 

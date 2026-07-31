@@ -74,7 +74,7 @@ if _ENV_FILE.exists():
 sys.path.insert(0, str(_SCRIPT_DIR))
 
 from gerrit_client import GerritClient, GerritAuthError, GerritAPIError
-from precommit_review import review as run_review
+from precommit_review import review_with_findings
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -168,6 +168,41 @@ def _report_is_ready(report: str) -> bool:
     return bool(_READY_RE.search(report))
 
 
+def _is_blocking_finding(finding: dict) -> bool:
+    """Return True when a finding should block commit readiness."""
+    return finding.get("severity") in ("HIGH", "MEDIUM")
+
+
+def _blocking_reason(finding: dict) -> str:
+    """Build a concise, human-readable blocking reason for summary output."""
+    checker = finding.get("checker", "")
+
+    if checker == "Dangerous API":
+        api = finding.get("api", "")
+        return f"Dangerous API: {api}" if api else "Dangerous API"
+
+    if checker.startswith("MISRA"):
+        rule = finding.get("rule", "")
+        message = finding.get("message", "")
+        token_match = re.search(r"\b([A-Za-z_][A-Za-z0-9_]*)\(\)", message)
+        token = token_match.group(1) if token_match else ""
+        if rule and token:
+            return f"MISRA {rule} ({token})"
+        if rule:
+            return f"MISRA {rule}"
+        return "MISRA violation"
+
+    if checker.startswith("CodeSonar"):
+        name = finding.get("codesonar_finding") or finding.get("message") or "CodeSonar finding"
+        return f"CodeSonar: {name}"
+
+    if checker.startswith("Memory"):
+        message = finding.get("message", "Memory issue")
+        return f"Memory: {message}"
+
+    return finding.get("message") or finding.get("description") or "Blocking finding"
+
+
 def run_hook(
     change_id: str,
     commit: str,
@@ -205,6 +240,7 @@ def run_hook(
     any_blocking = False
     any_fetch_failure = False
     all_inline_comments: dict[str, list[dict]] = {}
+    blocking_files: list[tuple[str, list[str]]] = []
     summary_lines: list[str] = [
         "CodeSonar Pre-Commit Review",
         "=" * 40,
@@ -218,16 +254,30 @@ def run_hook(
             )
             any_fetch_failure = True
             any_blocking = True
+            blocking_files.append((
+                gerrit_path,
+                ["Could not retrieve file content from Gerrit"],
+            ))
             continue
 
         try:
-            report = run_review(tmp_path)
+            review_result = review_with_findings(tmp_path)
         finally:
             tmp_path.unlink(missing_ok=True)
+
+        report = review_result.get("report", "")
+        findings = review_result.get("findings", [])
 
         file_ready = _report_is_ready(report)
         if not file_ready:
             any_blocking = True
+            reasons: list[str] = []
+            for finding in findings:
+                if _is_blocking_finding(finding):
+                    reason = _blocking_reason(finding)
+                    if reason not in reasons:
+                        reasons.append(reason)
+            blocking_files.append((gerrit_path, reasons))
 
         inline = _extract_inline_comments(report, Path(gerrit_path).name)
         if inline:
@@ -242,6 +292,21 @@ def run_hook(
         vote_label = "Verified -1 (file content fetch failed or blocking findings present)"
     else:
         vote_label = "Verified -1 (blocking findings present)" if any_blocking else "Verified +1"
+
+    if blocking_files:
+        summary_lines += [
+            "",
+            "Blocking Files",
+            "-" * 14,
+        ]
+        for index, (file_path, reasons) in enumerate(blocking_files, start=1):
+            summary_lines.append(f"{index}. {file_path}")
+            if reasons:
+                for reason in reasons:
+                    summary_lines.append(f"   - {reason}")
+            else:
+                summary_lines.append("   - Blocking findings present")
+            summary_lines.append("")
 
     summary_lines += [
         "",

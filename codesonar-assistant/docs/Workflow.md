@@ -45,6 +45,31 @@ flowchart TD
     J --> K[READY / NOT READY]
 ```
 
+## Command Cheat Sheet
+
+Start with one of these prompts when you are not sure what to ask:
+
+- `Update Tracker` to refresh live or offline data
+- `Dashboard` to see overall project metrics
+- `Project Health` to inspect risk concentration
+- `Fix Guide <class or issue>` to understand a specific finding
+- `Batch Fix Guide` to prioritize high-impact files
+- `Auto Fix <source file>` to apply safe edits and rerun review
+- `review <source file>` to run local pre-commit review
+- `Gerrit patchset review <gerrit link>` to review a patchset
+
+## Live and Offline Modes
+
+Live mode:
+1. Set `CODESONAR_REPORT_URL` to the report or CSV export endpoint.
+2. Add credentials or token/cookie values in `.env`.
+3. Run `Update Tracker` or `Dashboard` to download fresh data.
+
+Offline mode:
+1. Use an exported CSV or an existing tracker workbook.
+2. Point the assistant at the local file path.
+3. Run `Update Tracker`, `Dashboard`, or any issue query against the local data.
+
 ## Notes
 
 - Existing issue assignment metadata is preserved during sync
@@ -53,3 +78,4 @@ flowchart TD
 - Gerrit patchset review can also be triggered by the event listener on `patchset-created`
 - Gerrit patchset review downloads reviewable file contents from Gerrit before running the Review Engine
 - Auto Fix automatically repairs supported safe mechanical violations before re-running the pre-commit review; unsupported findings flow to Fix Guide
+- `CODESONAR_REPORT_URL` should be a report or CSV-download endpoint, not a sign-in page

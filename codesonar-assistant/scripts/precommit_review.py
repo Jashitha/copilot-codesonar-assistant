@@ -57,6 +57,22 @@ def review(file_path: str | Path) -> str:
     FileNotFoundError
         If *file_path* does not exist.
     """
+    result = review_with_findings(file_path)
+    return result["report"]
+
+
+def review_with_findings(file_path: str | Path) -> dict:
+    """
+    Run all checkers against *file_path* and return report plus raw findings.
+
+    Returns
+    -------
+    dict
+        {
+            "report": <formatted report string>,
+            "findings": <list of finding dicts>
+        }
+    """
     path = Path(file_path)
     code = path.read_text(encoding="utf-8", errors="replace")
 
@@ -64,7 +80,10 @@ def review(file_path: str | Path) -> str:
     for checker in _CHECKERS:
         findings.extend(checker.run(code))
 
-    return review_report.generate(path.name, findings)
+    return {
+        "report": review_report.generate(path.name, findings),
+        "findings": findings,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,170 @@ CodeSonar Assistant is a project-generic AI-powered GitHub Copilot agent for Cod
 
 Point it at your own project and it will download the latest report, update the tracker, generate dashboards, preserve assignments, auto-fix safe source patterns, and answer natural language queries about CodeSonar findings.
 
+## Quick Start Guide
+
+Choose one of the following modes depending on your environment.
+
+### Option 1 - Online Mode (Recommended)
+
+Use this mode if you have access to a CodeSonar server.
+
+1. Clone the repository.
+2. Copy `.env.example` to `.env`.
+3. Set these values in `.env`:
+
+```bash
+CODESONAR_REPORT_URL=
+CODESONAR_USERNAME=
+CODESONAR_PASSWORD=
+```
+
+`CODESONAR_REPORT_URL` is not the CodeSonar web homepage. It must point to the CodeSonar report or CSV download endpoint that the assistant uses to fetch the latest analysis results automatically.
+
+Think of the flow like this:
+
+```mermaid
+flowchart TD
+    A[CodeSonar Server] --> B[Latest Report]
+    B --> C[Export CSV]
+    C --> D[CSV Download URL]
+    D --> E[CODESONAR_REPORT_URL]
+```
+
+Every time you run `Update Tracker` or `Dashboard`, the assistant downloads the latest CSV from that URL.
+
+4. Run `Update Tracker`.
+
+This automatically:
+
+- downloads the latest CodeSonar report
+- filters `HB_PRIO_1` and `HB_PRIO_2`
+- synchronizes the tracker
+- preserves assignments
+- generates dashboards
+
+5. Start asking questions.
+
+Example:
+
+- `Dashboard`
+
+### Option 2 - Offline Mode
+
+Use this mode if you do not have access to the CodeSonar server.
+
+1. Export a CodeSonar CSV manually.
+2. Place it under `data/codesonar.csv`.
+3. Run `Update Tracker`.
+
+The assistant will build the tracker from the local CSV instead of downloading one.
+
+No `.env` configuration is required for offline mode.
+
+## Typical Workflow
+
+A normal developer workflow looks like this:
+
+```mermaid
+flowchart TD
+    A[Update Tracker] --> B[Dashboard]
+    B --> C[Project Health]
+    C --> D[Trend Analysis]
+    D --> E[Fix Guide]
+    E --> F[Auto Fix]
+    F --> G[Pre-Commit Review]
+    G --> H[Commit]
+    H --> I[Gerrit Patchset Review]
+```
+
+## Common Prompts
+
+### Tracker
+
+- `Update Tracker`
+- `Dashboard`
+- `Project Health`
+- `Trend Analysis`
+- `Project Summary`
+- `Hotspot Analysis`
+
+### Owner
+
+- `Owner Workload`
+- `Owner Progress`
+- `Recommend Owner`
+
+### Issue Investigation
+
+- `Issue Details <Issue ID>`
+- `Explain Issue <Issue ID>`
+- `Similar Issues <Issue ID>`
+- `Search Issues`
+- `Recommend Next Issue`
+
+### Fix Guidance
+
+- `How to fix <Issue Class>`
+- `Fix Guide <Issue ID>`
+- `Batch Fix Guide`
+- `Where should I focus for biggest impact?`
+
+Examples:
+
+- `How to fix Use After Free`
+- `How to fix Buffer Overrun`
+- `Fix Guide 6253372`
+
+### Auto Fix
+
+- `Auto Fix <source file>`
+
+Example:
+
+- `Auto Fix bsmd.c`
+
+### Pre-Commit Review
+
+Use this before committing your code.
+
+- `Review <source file>`
+- `Pre-Commit Review <source file>`
+- `Check my code <source file>`
+- `Commit Readiness <source file>`
+
+Example:
+
+- `Pre-Commit Review bsmd.c`
+
+### Gerrit Review
+
+Use this to review an entire Gerrit patchset.
+
+- `Gerrit review <gerrit patchset link>`
+
+Example:
+
+- `Gerrit review https://gerrit.company.com/c/project/+/480698`
+
+The assistant will:
+
+- download the modified files
+- review every file
+- identify blocking findings
+- generate commit readiness
+- post `Verified +1` or `Verified -1`
+
+### Not Sure What to Use?
+
+If you are not sure where to start, use:
+
+- `Update Tracker` for live or offline data refresh
+- `Dashboard` for the project overview
+- `Fix Guide <issue or class>` for remediation help
+- `Auto Fix <source file>` for safe mechanical changes
+
+When used as a reusable team assistant, it prioritizes these workflows in order:
+
 When used as a reusable team assistant, it prioritizes these workflows in order:
 
 1. HB_PRIO_1 / HB_PRIO_2 filtering
@@ -167,109 +331,6 @@ codesonar-assistant/
 ```
 
 Workspace-level agent definition is stored in the top-level repo at `agents/codesonar-assistant.md`.
-
-## Quick Start
-
-1. Clone the repository.
-
-```bash
-git clone <repository-url>
-cd codesonar-assistant
-```
-
-2. Create a virtual environment.
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-3. Install dependencies.
-
-```bash
-pip install -r requirements.txt
-```
-
-4. Configure environment variables for your project.
-
-```bash
-cp .env.example .env
-```
-
-Set `CODESONAR_REPORT_URL`, `CODESONAR_USERNAME`, and `CODESONAR_PASSWORD` (or the supported token/cookie values) in `.env` for live mode. For offline mode, provide an exported CSV or existing tracker as the input.
-
-5. Run the assistant.
-
-```bash
-python3 scripts/codesonar_assistant.py \
-    --input data/codesonar.csv \
-    --query "Dashboard"
-```
-
-After the tracker workflow has run successfully, you can also query the generated tracker directly:
-
-```bash
-python3 scripts/codesonar_assistant.py \
-    --input output/Master_Tracker.xlsx \
-    --query "Trend Analysis"
-```
-
-## Example Queries
-
-### Dashboard & Project
-
-- Dashboard
-- Project Health
-- Trend Analysis
-- Hotspot Analysis
-- Project Summary
-
-### Tracker
-
-- Update Tracker
-- Owner Workload for a
-- Owner Progress for b
-
-### Recommendations
-
-- Recommend Next Issue for a
-- Recommend Owner
-- Similar Issues 6253372
-
-### Issue Details
-
-- Issue 6253372
-- Explain Issue 6253372
-- Show issues in <file>
-- Show HB_PRIO_1 issues
-
-### Fix Guidance
-
-- How to fix Inappropriate Assignment Type
-- How to fix Use After Free
-- How to fix Use of strcpy
-- Fix Guide 1201340.7557926828
-- Batch Fix Guide
-- Auto Fix <source file>
-- Where should I focus for biggest impact?
-- Show root cause for issue 1201340.7557926828
-- Show suggested fix with code example
-- Show CWE and CERT-C mapping for Use After Free
-
-### Pre-Commit Review
-
-- review <source file>
-- pre-commit review <source file>
-- check my code <source file>
-- commit readiness <source file>
-
-### Gerrit / Auto-Fix
-
-- auto fix <source file>
-- Gerrit patchset review <gerrit link>
-- Gerrit gate patchset-created <gerrit link>
-
-Paste a Gerrit URL to review that patchset and gate it with CodeSonar findings.
 
 ## Output Files
 
