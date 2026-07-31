@@ -51,7 +51,6 @@ import os
 import re
 import sys
 import tempfile
-import subprocess
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -80,12 +79,10 @@ from precommit_review import review as run_review
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-_C_EXTENSIONS = {".c", ".h"}
+_REVIEWABLE_EXTENSIONS = {".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"}
 _HIGH_SEVERITY_RE = re.compile(r"Severity\s*:\s*HIGH", re.IGNORECASE)
-_LINE_RE = re.compile(r"^\s*Line\s+(\d+)\s*$", re.MULTILINE)
-_FINDING_BLOCK_RE = re.compile(
-    r"(Line\s+\d+.*?(?=\n\s*-{10,}|\Z))", re.DOTALL
-)
+_READY_RE = re.compile(r"^READY TO COMMIT$", re.MULTILINE)
+_NOT_READY_RE = re.compile(r"^NOT READY$", re.MULTILINE)
 
 
 def _has_high_severity(report: str) -> bool:
@@ -123,7 +120,7 @@ def _fetch_changed_c_files(
     client: GerritClient, change_id: str, revision_id: str
 ) -> list[str]:
     """
-    Return only the .c / .h files changed in this revision.
+    Return only reviewable C/C++ files changed in this revision.
     Falls back to an empty list with a warning on API error.
     """
     try:
@@ -133,20 +130,26 @@ def _fetch_changed_c_files(
               file=sys.stderr)
         return []
 
-    return [f for f in all_files if Path(f).suffix.lower() in _C_EXTENSIONS]
+    return [f for f in all_files if Path(f).suffix.lower() in _REVIEWABLE_EXTENSIONS]
 
 
-def _checkout_file(commit: str, gerrit_path: str) -> Path | None:
+def _fetch_file_from_gerrit(
+    client: GerritClient,
+    change_id: str,
+    revision_id: str,
+    gerrit_path: str,
+) -> Path | None:
     """
-    Try to `git show <commit>:<path>` and write it to a temp file.
-    Returns the temp Path, or None if git is unavailable / file not found.
+    Download the patchset file content from Gerrit and write it to a temp file.
+    Returns the temp Path, or None if Gerrit cannot return the file content.
     """
     try:
-        content = subprocess.check_output(
-            ["git", "show", f"{commit}:{gerrit_path}"],
-            stderr=subprocess.DEVNULL,
+        content = client.get_file_content(change_id, revision_id, gerrit_path)
+    except GerritAPIError as exc:
+        print(
+            f"[gerrit_hook] WARNING: could not retrieve {gerrit_path} from Gerrit: {exc}",
+            file=sys.stderr,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
     suffix = Path(gerrit_path).suffix or ".c"
@@ -156,6 +159,13 @@ def _checkout_file(commit: str, gerrit_path: str) -> Path | None:
     tmp.write(content)
     tmp.flush()
     return Path(tmp.name)
+
+
+def _report_is_ready(report: str) -> bool:
+    """Return True when the pre-commit report says the file is ready."""
+    if _NOT_READY_RE.search(report):
+        return False
+    return bool(_READY_RE.search(report))
 
 
 def run_hook(
@@ -192,7 +202,8 @@ def run_hook(
     print(f"[gerrit_hook] Reviewing {len(c_files)} file(s): {c_files}")
 
     # --- Run pre-commit review on each file -----------------------------------
-    any_high = False
+    any_blocking = False
+    any_fetch_failure = False
     all_inline_comments: dict[str, list[dict]] = {}
     summary_lines: list[str] = [
         "CodeSonar Pre-Commit Review",
@@ -200,11 +211,13 @@ def run_hook(
     ]
 
     for gerrit_path in c_files:
-        tmp_path = _checkout_file(commit, gerrit_path)
+        tmp_path = _fetch_file_from_gerrit(client, change_id, revision_id, gerrit_path)
         if tmp_path is None:
             summary_lines.append(
-                f"\n[SKIP] {gerrit_path}: could not retrieve file content."
+                f"\n[ERROR] {gerrit_path}: could not retrieve file content from Gerrit."
             )
+            any_fetch_failure = True
+            any_blocking = True
             continue
 
         try:
@@ -212,25 +225,28 @@ def run_hook(
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        file_has_high = _has_high_severity(report)
-        if file_has_high:
-            any_high = True
+        file_ready = _report_is_ready(report)
+        if not file_ready:
+            any_blocking = True
 
         inline = _extract_inline_comments(report, Path(gerrit_path).name)
         if inline:
             all_inline_comments[gerrit_path] = inline
 
-        status = "NOT READY" if file_has_high else "READY"
+        status = "READY" if file_ready else "NOT READY"
         summary_lines.append(f"\n{gerrit_path}  →  {status}")
 
     # --- Determine vote -------------------------------------------------------
-    verified = -1 if any_high else 1
-    vote_label = "Verified -1 (HIGH findings present)" if any_high else "Verified +1"
+    verified = -1 if any_blocking else 1
+    if any_fetch_failure:
+        vote_label = "Verified -1 (file content fetch failed or blocking findings present)"
+    else:
+        vote_label = "Verified -1 (blocking findings present)" if any_blocking else "Verified +1"
 
     summary_lines += [
         "",
         "=" * 40,
-        f"Commit Readiness : {'NOT READY' if any_high else 'READY'}",
+        f"Commit Readiness : {'NOT READY' if any_blocking else 'READY'}",
         f"Gerrit Vote       : {vote_label}",
     ]
 

@@ -423,11 +423,12 @@ Supported prompts include
 
 Current checker categories
 
-- Dangerous API
-- MISRA C rules for C programs
-- MISRA C++ or AUTOSAR C++14 rules for C++ programs
-- CodeSonar-mapped patterns
-- Memory (placeholder if checker returns none)
+- Language Detection (.c / .cpp)
+- MISRA C / MISRA C++ Analysis
+- CodeSonar Pattern Analysis
+- Dangerous API Analysis
+- Memory Safety Analysis
+- Custom Project Rules
 
 Return
 
@@ -435,6 +436,8 @@ Return
 - Line, severity, message, and recommendation
 - Summary counts per checker
 - Commit readiness (READY TO COMMIT or NOT READY)
+
+Gerrit review uses the same Review Engine after downloading reviewable file contents from Gerrit.
 
 ---
 

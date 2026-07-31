@@ -70,6 +70,10 @@ Query examples:
 
 Returns top class/file hotspots and a prioritized execution order to maximize finding reduction.
 
+## Review Engine
+
+The Review Engine powers both Pre-Commit Review and Gerrit Patchset Review.
+
 ## Pre-Commit Review
 
 Query examples:
@@ -78,24 +82,44 @@ Query examples:
 - `check my code bsmd.c`
 - `commit readiness bsmd.c`
 
+```mermaid
+flowchart TD
+    A[Pre-Commit Review] --> B[Language Detection (.c / .cpp)]
+    B --> C[MISRA C / MISRA C++ Analysis]
+    B --> D[CodeSonar Pattern Analysis]
+    B --> E[Dangerous API Analysis]
+    B --> F[Memory Safety Analysis]
+    B --> G[Custom Project Rules]
+    C --> H[Commit Readiness Report]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+```
+
 Returns:
 - Findings grouped by checker
 - Line, severity, message, and recommendation
+- MISRA Rule when available
+- Status: Auto Fix Supported or Manual Fix Required
+- Reason for the status
 - Summary counts per checker
 - Commit readiness (`READY TO COMMIT` or `NOT READY`)
 
-## Gerrit Review
+## Gerrit Patchset Review
 
 Query examples:
 - `Gerrit patchset review https://gerrit.example.com/c/project/+/123/4`
 - `Gerrit gate patchset-created https://gerrit.example.com/c/project/+/123/4`
 
-Returns a Gerrit review summary for the pasted link and posts a `Verified -1`
-vote when HIGH severity findings remain.
+Returns a Gerrit review summary for the pasted link, downloads reviewable file contents from Gerrit, runs the Review Engine, and posts a `Verified -1`
+vote when blocking findings remain.
 
 ## Auto Fix
 
 Query examples:
 - `Auto Fix tests/sample_code/dangerous_api.c`
 
-Applies safe mechanical fixes where possible, then reruns the pre-commit review.
+Auto Fix automatically repairs supported safe mechanical violations. It applies safe mechanical fixes where possible, reruns the pre-commit review, and leaves unsupported findings for the Fix Guide workflow.
+
+Supported categories include safe API replacements and simple null-check reorderings; unsupported categories remain manual.

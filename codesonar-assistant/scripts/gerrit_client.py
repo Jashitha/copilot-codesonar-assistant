@@ -32,6 +32,7 @@ import os
 import urllib.request
 import urllib.error
 import base64
+from urllib.parse import quote
 from typing import Optional
 
 
@@ -141,8 +142,33 @@ class GerritClient:
 
     def get_change_detail(self, change_id: str) -> dict:
         """Return Gerrit change detail for resolving revision metadata."""
-        endpoint = f"{self._base_url}/a/changes/{change_id}/detail"
+        endpoint = (
+            f"{self._base_url}/a/changes/{change_id}/detail"
+            "?o=ALL_REVISIONS&o=CURRENT_REVISION"
+        )
         return self._get_json(endpoint)
+
+    def get_file_content(
+        self,
+        change_id: str,
+        revision_id: str,
+        file_path: str,
+    ) -> bytes:
+        """Return decoded file content for a reviewable patchset file."""
+        encoded_path = quote(file_path, safe="")
+        endpoint = (
+            f"{self._base_url}/a/changes/{change_id}"
+            f"/revisions/{revision_id}/files/{encoded_path}/content"
+        )
+        req = urllib.request.Request(
+            endpoint,
+            headers={"Authorization": self._auth_header},
+            method="GET",
+        )
+        raw = self._send(req, endpoint)
+        if raw.startswith(b")]}"):
+            raw = raw[raw.index(b"\n") + 1 :]
+        return base64.b64decode(raw)
 
     def get_revision_info(self, change_id: str, revision_id: str) -> dict:
         """Return Gerrit revision metadata for a specific revision."""

@@ -1,6 +1,8 @@
 """
 auto_fix.py
 
+Auto Fix automatically repairs supported safe mechanical violations.
+
 Applies safe, mechanical source fixes for a subset of common findings.
 
 Scope (intentionally conservative):
@@ -205,6 +207,7 @@ def run_auto_fix(query: str) -> dict:
     after_medium = _count_severity(after_report, "MEDIUM")
 
     answer = (
+        "Auto Fix automatically repairs supported safe mechanical violations.\n\n"
         "Auto-fix completed.\n\n"
         f"File: {src_path}\n"
         f"Applied fixes:\n"

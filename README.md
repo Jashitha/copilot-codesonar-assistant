@@ -64,13 +64,25 @@ Provides fix guidance for CodeSonar findings, including:
 - Recommended remediation
 - High-impact procedures/files to prioritize
 
-### Pre-Commit Code Review
-Review source files before commit using built-in checkers:
+### Review Engine
+The assistant uses a shared Review Engine for both Pre-Commit Review and Gerrit Patchset Review.
 
-- Dangerous API checker
-- MISRA-C:2012 checker
-- CodeSonar-mapped pattern checker
-- Memory checker (placeholder when no rules are returned)
+Review source files before commit using a language-aware checker pipeline:
+
+```mermaid
+flowchart TD
+    A[Pre-Commit Review] --> B[Language Detection (.c / .cpp)]
+    B --> C[MISRA C / MISRA C++ Analysis]
+    B --> D[CodeSonar Pattern Analysis]
+    B --> E[Dangerous API Analysis]
+    B --> F[Memory Safety Analysis]
+    B --> G[Custom Project Rules]
+    C --> H[Commit Readiness Report]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+```
 
 Returns grouped findings with line, severity, message, recommendation, summary counts, and commit readiness.
 
@@ -83,22 +95,60 @@ The assistant can generate concise summary reports for teams that emphasize:
 - Standards mapping summary when available
 - Files and classes that carry the highest impact
 
-### Gerrit Integration
-The assistant can also run as a Gerrit patchset listener and gate reviews automatically:
+### Gerrit Patchset Review
+The assistant performs an automated review of a Gerrit patchset by:
 
-- Watches `patchset-created` events from Gerrit SSH stream-events
-- Reviews changed `.c` and `.h` files using the existing pre-commit checkers
-- Posts inline comments back to Gerrit for HIGH severity findings
-- Casts `Verified -1` when HIGH severity findings are present
-- Casts `Verified +1` when the patchset is clean
-- Supports an auto-fix workflow for safe mechanical changes before manual review
+- Fetching the modified files from the patchset
+- Running the Review Engine on each file
+- Detecting:
+    - MISRA violations (current supported rule set)
+    - Dangerous API usage
+    - CodeSonar-mapped patterns
+    - Memory safety issues
+- Aggregating findings across the patchset
+- Generating an overall Commit Readiness Report
+- Posting an appropriate Gerrit verification vote:
+    - Verified +1 — no blocking findings
+    - Verified -1 — blocking findings detected
+
+The Gerrit Review workflow uses the same analysis engine as the Pre-Commit Review. Instead of reviewing a single local file, it automatically retrieves all modified files from the Gerrit patchset, analyzes them using the configured checkers, generates a consolidated review report, determines commit readiness, and posts the appropriate Gerrit verification vote.
 
 ### Auto-Fix
-For safe mechanical issues, the assistant can apply direct fixes before re-running review:
+Auto Fix automatically repairs supported safe mechanical violations.
 
-- `strcpy(dst, src)` -> `snprintf(dst, sizeof(dst), "%s", src)`
-- `sprintf(dst, ...)` -> `snprintf(dst, sizeof(dst), ...)`
-- obvious null-check-after-dereference reorderings
+Workflow:
+
+```mermaid
+flowchart TD
+    A[Pre-Commit Review] --> B[Detect MISRA violations]
+    B --> C{Can Auto Fix?}
+    C -->|Yes| D[Apply fix]
+    C -->|No| E[Provide Fix Guide]
+    D --> F[Re-run Review]
+    E --> F
+    F --> G[Commit Readiness Report]
+```
+
+Supported auto-fixable categories:
+- Safe API replacements
+- Missing null checks in simple patterns
+- `strcpy` -> safer alternative
+- `sprintf` -> `snprintf`
+- Simple initialization fixes
+- Missing braces when implemented
+- Redundant parentheses when implemented
+
+Manual Fix Required categories:
+- Essential type model violations
+- Inappropriate assignment type
+- Cast removes const
+- Pointer conversions
+- Control-flow restructuring
+- Side effects in expressions
+- Dynamic memory policy decisions
+- Architecture/design issues
+
+The assistant detects MISRA violations, automatically repairs supported safe mechanical violations, provides detailed fix guidance for the remaining issues, and re-runs the review to produce an updated Commit Readiness Report.
 
 ## Folder Structure
 
@@ -239,6 +289,14 @@ The assistant automatically generates:
 - Applies safe auto-fixes for common patterns
 - Can block Gerrit patchsets with Verified -1 when HIGH severity findings remain
 - Enables natural language interaction with CodeSonar data through GitHub Copilot
+
+## Future Enhancements
+
+- Expand MISRA C rule coverage
+- Add MISRA C++ / AUTOSAR C++14 checks
+- More advanced memory-safety rules
+- Additional CodeSonar pattern detection
+- Custom project-specific coding guidelines
 
 ## License
 

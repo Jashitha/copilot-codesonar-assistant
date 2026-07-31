@@ -1,7 +1,7 @@
 """
 misra_checker.py
 
-Responsibility: detect MISRA-C:2012 rule violations via static pattern analysis.
+Responsibility: detect MISRA C issues via static pattern analysis.
 
 Contract:
   - Accepts source code as a plain string.
@@ -73,7 +73,7 @@ _RULES: list[tuple] = [
 
 def run(code: str) -> list[dict]:
     """
-    Scan *code* for MISRA-C:2012 violations.
+    Scan *code* for MISRA C issues.
     Returns a list of finding dicts compatible with review_report.generate().
     """
     findings: list[dict] = []
@@ -90,7 +90,7 @@ def run(code: str) -> list[dict]:
                 token = match.group(1) if match.lastindex and match.lastindex >= 1 else ""
                 findings.append(
                     {
-                        "checker": "MISRA-C:2012",
+                        "checker": "MISRA C",
                         "rule": rule_id,
                         "line": lineno,
                         "severity": severity,

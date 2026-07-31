@@ -2,7 +2,7 @@
 codesonar_checker.py
 
 Responsibility: detect patterns that map to known CodeSonar finding classes,
-annotated with the correlated MISRA-C:2012 rule.
+annotated with the correlated MISRA C rule.
 
 Contract:
   - Accepts source code as a plain string.

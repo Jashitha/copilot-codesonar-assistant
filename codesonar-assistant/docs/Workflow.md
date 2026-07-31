@@ -25,21 +25,25 @@ Generate Dashboard
         v
 Ready for Queries
 
-Gerrit review flow:
+Gerrit Patchset Review flow:
 
-Paste Gerrit link
-        |
-        v
-Resolve change and patchset
-        |
-        v
-Run CodeSonar pre-commit review
-        |
-        v
-Post Gerrit comments and Verified vote
-        |
-        v
-READY / NOT READY
+```mermaid
+flowchart TD
+    A[Paste Gerrit link] --> B[Resolve change and patchset]
+    B --> C[Language Detection (.c / .cpp)]
+    C --> D[MISRA C / MISRA C++ Analysis]
+    C --> E[CodeSonar Pattern Analysis]
+    C --> F[Dangerous API Analysis]
+    C --> G[Memory Safety Analysis]
+    C --> H[Custom Project Rules]
+        D --> I[Commit Readiness Report]
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J[Post Gerrit comments and Verified vote]
+    J --> K[READY / NOT READY]
+```
 
 ## Notes
 
@@ -47,4 +51,5 @@ READY / NOT READY
 - Newly introduced issues are assigned from configured owner/reviewer pools
 - Workflow outputs are timestamped for historical analysis
 - Gerrit patchset review can also be triggered by the event listener on `patchset-created`
-- Auto Fix runs safe mechanical edits before re-running the pre-commit review
+- Gerrit patchset review downloads reviewable file contents from Gerrit before running the Review Engine
+- Auto Fix automatically repairs supported safe mechanical violations before re-running the pre-commit review; unsupported findings flow to Fix Guide
