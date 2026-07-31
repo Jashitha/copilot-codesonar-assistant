@@ -39,7 +39,7 @@ Set values in `.env`:
 - `CODESONAR_PASSWORD`
 - Optional: `CODESONAR_COOKIE`, `CODESONAR_TOKEN`, `CODESONAR_OWNERS`, `CODESONAR_INSECURE`
 
-If you want Gerrit review and gate workflows, also set:
+Also set Gerrit values for review and gate workflows:
 
 - `GERRIT_URL`
 - `GERRIT_USER`
