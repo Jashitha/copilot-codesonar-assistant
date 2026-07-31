@@ -7,6 +7,8 @@ git clone <your-repo-url>
 cd codesonar-assistant
 ```
 
+If you want the full assistant workspace, clone this repository and open it in VS Code. The workspace agent definition is already included at `agents/codesonar-assistant.md`.
+
 ## 2. Create Virtual Environment
 
 ```bash
@@ -24,7 +26,7 @@ pip install -r requirements.txt
 
 The agent definition is maintained in the top-level repo at `agents/codesonar-assistant.md`.
 
-If needed by your setup, use that file as the source for your VS Code agent/customization location.
+If you are creating a new workspace, copy that file into the target workspace's `agents/` folder. VS Code will use it as the workspace-level agent configuration once the workspace is opened or reloaded.
 
 ## 5. Configure Environment
 

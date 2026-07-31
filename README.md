@@ -7,6 +7,31 @@ CodeSonar Assistant is a project-generic AI-powered GitHub Copilot agent for Cod
 
 Point it at your own project and it will download the latest report, update the tracker, generate dashboards, preserve assignments, auto-fix safe source patterns, and answer natural language queries about CodeSonar findings.
 
+## Download The Whole Project
+
+If you want to use the assistant exactly as shipped here, clone the whole repository and open it as a VS Code workspace:
+
+```bash
+git clone <repository-url>
+cd codesonar-assistant
+code .
+```
+
+This gives you the full assistant, the docs, the sample data, and the workspace agent definition in `agents/codesonar-assistant.md`.
+
+## Set Up This Agent In A Workspace
+
+The workspace agent is already included in this repo at [agents/codesonar-assistant.md](agents/codesonar-assistant.md).
+
+To use it in another workspace:
+
+1. Create an `agents/` folder in the target workspace if it does not exist.
+2. Copy `agents/codesonar-assistant.md` into that folder.
+3. Open the workspace in VS Code.
+4. Reload VS Code or reopen the workspace so the agent definition is picked up.
+
+If you are cloning this repository to use the assistant, no extra agent setup is needed beyond opening the workspace.
+
 ## Quick Start Guide
 
 Choose one of the following modes depending on your environment.
