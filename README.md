@@ -152,7 +152,7 @@ Examples:
 
 Example:
 
-- `Auto Fix bsmd.c`
+- `Auto Fix file_name.c`
 
 ### Pre-Commit Review
 
