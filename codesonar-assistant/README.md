@@ -72,13 +72,13 @@ Review source files before commit using a language-aware checker pipeline:
 
 ```mermaid
 flowchart TD
-    A[Pre-Commit Review] --> B[Language Detection (.c / .cpp)]
-    B --> C[MISRA C / MISRA C++ Analysis]
-    B --> D[CodeSonar Pattern Analysis]
-    B --> E[Dangerous API Analysis]
-    B --> F[Memory Safety Analysis]
-    B --> G[Custom Project Rules]
-    C --> H[Commit Readiness Report]
+    A["Pre-Commit Review"] --> B["Language Detection (.c / .cpp)"]
+    B --> C["MISRA C / MISRA C++ Analysis"]
+    B --> D["CodeSonar Pattern Analysis"]
+    B --> E["Dangerous API Analysis"]
+    B --> F["Memory Safety Analysis"]
+    B --> G["Custom Project Rules"]
+    C --> H["Commit Readiness Report"]
     D --> H
     E --> H
     F --> H
