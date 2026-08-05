@@ -309,13 +309,17 @@ Workflow:
 
 ```mermaid
 flowchart TD
-    A[Pre-Commit Review] --> B[Detect MISRA violations]
-    B --> C{Can Auto Fix?}
-    C -->|Yes| D[Apply fix]
-    C -->|No| E[Provide Fix Guide]
-    D --> F[Re-run Review]
-    E --> F
-    F --> G[Commit Readiness Report]
+    A["Pre-Commit Review"] --> B["Language Detection (.c / .cpp)"]
+    B --> C["MISRA C / MISRA C++ Analysis"]
+    B --> D["CodeSonar Pattern Analysis"]
+    B --> E["Dangerous API Analysis"]
+    B --> F["Memory Safety Analysis"]
+    B --> G["Custom Project Rules"]
+    C --> H["Commit Readiness Report"]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
 ```
 
 Supported auto-fixable categories:
