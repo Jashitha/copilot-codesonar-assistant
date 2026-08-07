@@ -30,6 +30,8 @@ If you are creating a new workspace, copy that file into the target workspace's 
 
 ## 5. Configure Environment
 
+`.env` is created automatically from `.env.example` the first time you run any assistant script (for example `daily_workflow.py`, `codesonar_assistant.py`, `gerrit_hook.py`, or `gerrit_event_listener.py`), so this step is optional. To create it yourself instead:
+
 ```bash
 cp .env.example .env
 ```

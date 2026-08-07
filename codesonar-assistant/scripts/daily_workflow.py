@@ -35,7 +35,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 TASK_DIR = SCRIPT_DIR.parent
 DATA_DIR = TASK_DIR / "data"
 OUTPUT_DIR = TASK_DIR / "output"
-ENV_FILE = TASK_DIR / ".env"
+
+from env_bootstrap import ensure_env_file
+
+ENV_FILE = ensure_env_file(TASK_DIR)
 
 DEFAULT_PROJECT_URL = "https://codesonar-idc.harman.com:7340/project/2601.html?theme=light"
 

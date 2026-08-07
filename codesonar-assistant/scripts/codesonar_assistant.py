@@ -13,11 +13,12 @@ import pandas as pd
 from intent import detect_intent
 from dispatcher import dispatch
 from filters import filter_high_priority
+from env_bootstrap import ensure_env_file
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TASK_DIR = SCRIPT_DIR.parent
-ENV_FILE = TASK_DIR / ".env"
+ENV_FILE = ensure_env_file(TASK_DIR)
 
 
 def resolve_input_path(input_file: str) -> Path:

@@ -49,9 +49,13 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _TASK_DIR = _SCRIPT_DIR.parent
-_ENV_FILE = _TASK_DIR / ".env"
 _LOG_DIR = _TASK_DIR / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
+
+sys.path.insert(0, str(_SCRIPT_DIR))
+from env_bootstrap import ensure_env_file  # noqa: E402
+
+_ENV_FILE = ensure_env_file(_TASK_DIR)
 
 if _ENV_FILE.exists():
     with open(_ENV_FILE) as _fh:

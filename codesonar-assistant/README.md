@@ -19,6 +19,42 @@ When used as a reusable team assistant, it prioritizes these workflows in order:
 8. Pre-commit code review for new changes
 9. Automatic summary report generation
 
+## How It Works
+
+**Offline mode** — analyze an exported CSV or an existing tracker, no server connection required:
+
+```mermaid
+flowchart LR
+    A[Exported CodeSonar CSV or existing Master_Tracker.xlsx] --> B[--input path]
+    B --> C[codesonar_assistant.py --query ...]
+    C --> D[Answer / Dashboard / Fix Guide]
+```
+
+**Online / live mode** — connect to a CodeSonar server via `.env` and refresh the tracker automatically:
+
+```mermaid
+flowchart LR
+    A[.env: CODESONAR_REPORT_URL + credentials] --> B[Update Tracker]
+    B --> C[Download latest CodeSonar CSV]
+    C --> D[Filter HB_PRIO_1 / HB_PRIO_2]
+    D --> E[Sync Master_Tracker.xlsx]
+    E --> F[Dashboard / Queries]
+```
+
+## Legacy Code vs New Code
+
+The assistant supports two complementary use cases:
+
+**Legacy code (existing backlog of findings)**
+- Run `Update Tracker` to pull the latest CodeSonar report and sync it into `Master_Tracker.xlsx`
+- Use `Dashboard`, `Project Health`, `Hotspot Analysis`, and `Batch Fix Guide` to triage the backlog and prioritize high-impact files
+- Owner, Reviewer, Status, and ETA are preserved across runs, so existing assignments are never lost
+
+**New code (active development / code under review)**
+- Run `review <file>` or `pre-commit review <file>` before committing to catch MISRA, dangerous API, and memory-safety issues locally
+- Run `Auto Fix <file>` to apply safe mechanical fixes automatically
+- Use `Gerrit patchset review <link>` to gate a patchset with a `Verified +1/-1` vote, independent of the tracker workflow
+
 ## Key Features
 
 ### Tracker Management
@@ -28,6 +64,27 @@ When used as a reusable team assistant, it prioritizes these workflows in order:
 - Preserve Owner, Reviewer, Status, ETA, and Review information
 - Automatically assign new findings when owner/reviewer pools are configured
 - Generate updated Master Tracker, timestamped snapshots, and tracker history
+
+**What `Update Tracker` actually does, step by step:**
+
+1. Downloads the latest CodeSonar CSV from `CODESONAR_REPORT_URL` (tries the `.csv` variant of an `.html` URL, then follows analysis-index links if needed)
+2. Filters findings down to `HB_PRIO_1` and `HB_PRIO_2`
+3. Reads the existing `Master_Tracker.xlsx` (if present) and merges the new report by issue `id`
+4. For existing issues, preserves `Owner`, `Status`, `ETA`, `Reviewer`, `ReviewStatus`, `ReviewETA`
+5. For new issues, sets `Owner`/`Reviewer` to `Unassigned` and `Status`/`ReviewStatus` to `Pending`
+6. Auto-assigns new issues round-robin across `CODESONAR_OWNERS`/`CODESONAR_REVIEWERS` if configured
+7. Writes `output/Master_Tracker.xlsx`, a timestamped snapshot `output/Master_Tracker_YYYYMMDD.xlsx`, and appends a row to `output/Tracker_History.xlsx`
+8. Prints a summary of original findings, HB_PRIO_1/HB_PRIO_2 counts, new/resolved/reopened issues, and assignment counts
+
+```mermaid
+flowchart TD
+    A[Update Tracker] --> B[Download latest CodeSonar CSV]
+    B --> C[Filter HB_PRIO_1 / HB_PRIO_2]
+    C --> D[Sync with existing Master_Tracker.xlsx]
+    D --> E[Preserve Owner / Status / ETA / Reviewer]
+    E --> F[Auto-assign new issues]
+    F --> G[Save Master_Tracker.xlsx + snapshot + Tracker_History.xlsx]
+```
 
 ### Dashboard & Analytics
 - Dashboard summary
@@ -160,37 +217,26 @@ codesonar-assistant/
 
 Workspace-level agent definition is stored in the top-level repo at `agents/codesonar-assistant.md`.
 
-## Quick Start
+## Environment Setup
 
-1. Clone the repository.
+`.env` holds your CodeSonar and Gerrit connection settings. It is created automatically from `.env.example` the first time you run any assistant script (`daily_workflow.py`, `codesonar_assistant.py`, `gerrit_hook.py`, or `gerrit_event_listener.py`) — no manual copy step required, and an existing `.env` is never overwritten.
+
+The most important value is `CODESONAR_REPORT_URL`:
+
+- It must point to the CodeSonar **report or CSV export endpoint** for your project/analysis, not the sign-in page.
+- If you provide the project/analysis `.html` URL, the workflow also tries the equivalent `.csv` URL automatically.
+- Live-mode downloads require this URL plus `CODESONAR_USERNAME`/`CODESONAR_PASSWORD`, or a `CODESONAR_COOKIE`/`CODESONAR_TOKEN`.
+
+For offline mode, skip `.env` entirely and point `--input` at an exported CSV or existing tracker. See [INSTALL.md](INSTALL.md) for the full list of `.env` variables (owner/reviewer pools, Gerrit settings, etc.).
+
+## Quick Start
 
 ```bash
 git clone <repository-url>
 cd codesonar-assistant
-```
-
-2. Create a virtual environment.
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-3. Install dependencies.
-
-```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
-
-4. Configure environment variables for your project.
-
-```bash
-cp .env.example .env
-```
-
-Set `CODESONAR_REPORT_URL`, `CODESONAR_USERNAME`, and `CODESONAR_PASSWORD` (or the supported token/cookie values) in `.env` for live mode. For offline mode, provide an exported CSV or existing tracker as the input.
-
-5. Run the assistant.
 
 ```bash
 python3 scripts/codesonar_assistant.py \
@@ -205,6 +251,16 @@ python3 scripts/codesonar_assistant.py \
     --input output/Master_Tracker.xlsx \
     --query "Trend Analysis"
 ```
+
+For full step-by-step installation (virtual environment, dependencies, agent file, Gerrit setup), see [INSTALL.md](INSTALL.md).
+
+## First Commands to Try
+
+- `Update Tracker` — download the latest report and refresh `Master_Tracker.xlsx`
+- `Dashboard` — overall project metrics
+- `Project Health` — risk concentration and status
+- `review <source file>` — local pre-commit review
+- `Fix Guide <class or issue>` — understand and fix a specific finding
 
 ## Example Queries
 
@@ -263,13 +319,15 @@ python3 scripts/codesonar_assistant.py \
 
 Paste a Gerrit URL to review that patchset and gate it with CodeSonar findings.
 
-## Output Files
+## Generated Excel Outputs
 
-The assistant automatically generates:
+Every `Update Tracker` run writes:
 
-- Master_Tracker.xlsx (two sheets: Summary + Details)
-- Tracker_History.xlsx
-- Timestamped tracker snapshots (same two-sheet structure)
+- **`output/Master_Tracker.xlsx`** — two sheets:
+  - `Summary`: Overall Metrics (Total Issues, Pending, Done, HB_PRIO_1, HB_PRIO_2, Owners, Reviewers), Top Files, Issue Class Distribution, Owner Workload, Reviewer Workload
+  - `Details`: one row per finding — `score`, `id`, `class`, `significance`, `file`, `line number`, `procedure`, `priority`, `state`, `finding`, `owner`, `reviewer`, `url`, plus the tracker columns `Owner`, `Status`, `ETA`, `Reviewer`, `ReviewStatus`, `ReviewETA`
+- **`output/Master_Tracker_YYYYMMDD.xlsx`** — a timestamped snapshot with the same two-sheet structure, kept for historical comparison
+- **`output/Tracker_History.xlsx`** — one row per day (`Date`, `Total`, `HB1`, `HB2`, `New`, `Resolved`), used by `Trend Analysis`
 
 ## Benefits
 
