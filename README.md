@@ -7,6 +7,24 @@ CodeSonar Assistant is a project-generic AI-powered GitHub Copilot agent for Cod
 
 Point it at your own project and it will download the latest report, update the tracker, generate dashboards, preserve assignments, auto-fix safe source patterns, and answer natural language queries about CodeSonar findings.
 
+## 🚀 What's New in v2.0
+
+- Interactive ASPICE-style Dashboard
+- Executive Project Health Summary
+- Project Health KPIs
+- Priority Distribution Charts
+- Issue Class Distribution
+- Top Files Analysis
+- Owner Workload Dashboard
+- Hotspot Analysis
+- Trend Analysis
+- Search & Filter Findings
+- Finding Details View
+- Dark / Light Theme
+- CSV Export
+- Print Dashboard
+- Dashboard automatically generated after Update Tracker
+
 ## Download The Whole Project
 
 If you want to use the assistant exactly as shipped here, clone the whole repository and open it as a VS Code workspace:
@@ -98,14 +116,15 @@ A normal developer workflow looks like this:
 
 ```mermaid
 flowchart TD
-    A[Update Tracker] --> B[Dashboard]
-    B --> C[Project Health]
-    C --> D[Trend Analysis]
-    D --> E[Fix Guide]
-    E --> F[Auto Fix]
+    A[Update Tracker] --> B[Download Latest Report]
+    B --> C[Update Master Tracker]
+    C --> D[Generate Reports]
+    D --> E[Generate Interactive Dashboard]
+    E --> F[Dashboard]
     F --> G[Pre-Commit Review]
-    G --> H[Commit]
-    H --> I[Gerrit Patchset Review]
+    G --> H[Auto Fix]
+    H --> I[Commit]
+    I --> J[Gerrit Patchset Review]
 ```
 
 ## Common Prompts
@@ -219,6 +238,7 @@ When used as a reusable team assistant, it prioritizes these workflows in order:
 - Generate updated Master Tracker, timestamped snapshots, and tracker history
 
 ### Dashboard & Analytics
+- `Dashboard` opens the Interactive Dashboard generated at `output/dashboard/index.html` — it does not re-download CodeSonar data; run `Update Tracker` first to refresh it.
 - Dashboard summary
 - Project Health analysis
 - Trend Analysis (compare tracker snapshots)
@@ -343,6 +363,31 @@ Manual Fix Required categories:
 
 The assistant detects MISRA violations, automatically repairs supported safe mechanical violations, provides detailed fix guidance for the remaining issues, and re-runs the review to produce an updated Commit Readiness Report.
 
+## Interactive Dashboard
+
+CodeSonar Assistant v2.0 introduces a fully static, ASPICE-style Interactive Dashboard that is automatically generated after every `Update Tracker` run. It requires no server — just open `output/dashboard/index.html` in a browser.
+
+The dashboard provides:
+
+- Executive Summary
+- Project Health
+- Quality KPIs
+- Priority Distribution
+- Issue Class Distribution
+- Top Files
+- Owner Dashboard
+- Hotspot Analysis
+- Trend Analysis
+- Search & Filters
+- Detailed Finding View
+- Dark/Light Theme
+- CSV Export
+- Print Support
+
+## Dashboard Preview
+
+![Interactive Dashboard](docs/images/dashboard.png)
+
 ## Folder Structure
 
 ```text
@@ -369,6 +414,18 @@ The assistant automatically generates:
 - Tracker_History.xlsx
 - Timestamped tracker snapshots (same two-sheet structure)
 
+Every `Update Tracker` run also (re)generates the static Interactive Dashboard:
+
+```text
+output/
+└── dashboard/
+    ├── index.html
+    ├── dashboard_data.json
+    ├── css/
+    ├── js/
+    └── assets/
+```
+
 ## Benefits
 
 - Eliminates repetitive manual tracker updates
@@ -379,6 +436,12 @@ The assistant automatically generates:
 - Applies safe auto-fixes for common patterns
 - Can block Gerrit patchsets with Verified -1 when HIGH severity findings remain
 - Enables natural language interaction with CodeSonar data through GitHub Copilot
+- Interactive engineering dashboard
+- ASPICE-style project health reporting
+- Faster hotspot identification
+- Visual owner workload tracking
+- Easier release readiness reviews
+- One-click dashboard generation
 
 ## Future Enhancements
 
@@ -387,6 +450,29 @@ The assistant automatically generates:
 - More advanced memory-safety rules
 - Additional CodeSonar pattern detection
 - Custom project-specific coding guidelines
+- Scheduled email reports
+- Teams/Slack notifications
+- Multi-project dashboard
+- Live dashboard refresh
+- AI-powered engineering insights
+- Release readiness prediction
+- Historical analytics
+
+## Version
+
+Current Version: v2.0
+
+Major Features:
+- Tracker Management
+- Interactive Dashboard
+- Project Health
+- Trend Analysis
+- Hotspot Analysis
+- Pre-Commit Review
+- Gerrit Review
+- Auto Fix
+- Fix Guidance
+- Summary Reports
 
 ## License
 
