@@ -96,6 +96,8 @@ flowchart TD
 - Owner Workload
 - Owner Progress
 - Automatic summary report generation
+- The static dashboard output is self-contained so `output/dashboard/index.html` can be opened directly from disk.
+- Owner and reviewer pools can be configured in `.env` with `CODESONAR_OWNERS` and `CODESONAR_REVIEWERS`; the dashboard and tracker workflow both honor those values.
 
 ### Issue Analysis
 - Recommend Next Issue

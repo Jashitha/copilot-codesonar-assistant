@@ -719,6 +719,18 @@ def run_daily_workflow(args: argparse.Namespace) -> int:
         daily_tracker=daily_tracker,
         history_path=history_path,
     )
+
+    # ── Interactive dashboard (v2.0) ────────────────────────────────────────
+    # Regenerate the static HTML dashboard from the tracker we just wrote.
+    # Best-effort only: a dashboard rendering issue must never fail the
+    # Update Tracker workflow itself.
+    try:
+        from dashboard import generate_dashboard
+        dashboard_result = generate_dashboard(TASK_DIR)
+        print(f"  Dashboard          : {dashboard_result['message']}")
+    except Exception as exc:
+        print(f"[warn] Dashboard generation skipped: {exc}")
+
     return 0
 
 

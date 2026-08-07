@@ -374,6 +374,14 @@ def main():
             return
         # Read the tracker (not the raw CSV) so Owner/Reviewer assignments are included.
         df, source = load_input(str(dashboard_tracker))
+
+        # Regenerate the static interactive dashboard (v2.0) from the refreshed
+        # tracker. Best-effort: a rendering issue must not break the chat reply.
+        try:
+            from dashboard import generate_dashboard
+            generate_dashboard(TASK_DIR)
+        except Exception as exc:
+            print(f"[warn] Dashboard generation skipped: {exc}", file=sys.stderr)
     else:
         df, source = load_input(args.input)
 
