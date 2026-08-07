@@ -33,12 +33,15 @@ flowchart LR
 **Online / live mode** — connect to a CodeSonar server via `.env` and refresh the tracker automatically:
 
 ```mermaid
-flowchart LR
-    A[.env: CODESONAR_REPORT_URL + credentials] --> B[Update Tracker]
-    B --> C[Download latest CodeSonar CSV]
-    C --> D[Filter HB_PRIO_1 / HB_PRIO_2]
-    D --> E[Sync Master_Tracker.xlsx]
-    E --> F[Dashboard / Queries]
+flowchart TD
+    A[Update Tracker] --> B[Dashboard]
+    B --> C[Project Health]
+    C --> D[Trend Analysis]
+    D --> E[Fix Guide]
+    E --> F[Auto Fix]
+    F --> G[Pre-Commit Review]
+    G --> H[Commit]
+    H --> I[Gerrit Patchset Review]
 ```
 
 ## Legacy Code vs New Code
