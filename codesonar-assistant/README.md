@@ -98,6 +98,7 @@ flowchart TD
 - Automatic summary report generation
 - The static dashboard output is self-contained so `output/dashboard/index.html` can be opened directly from disk.
 - Owner and reviewer pools can be configured in `.env` with `CODESONAR_OWNERS` and `CODESONAR_REVIEWERS`; the dashboard and tracker workflow both honor those values.
+- Configured owners now appear in the dashboard owner list and owner filter even before any issues are assigned to them.
 
 ### Issue Analysis
 - Recommend Next Issue
