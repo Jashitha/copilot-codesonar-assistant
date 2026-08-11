@@ -41,6 +41,7 @@ from tracker_workflow_runner import run_tracker_workflow
 from precommit_review import run_precommit_review
 from auto_fix import run_auto_fix
 from gerrit_review import run_gerrit_review
+from email_report import daily_code_sonar_report, preview_daily_code_sonar_report, send_daily_code_sonar_report
 
 
 def dispatch(df, intent, query):
@@ -274,6 +275,15 @@ def dispatch(df, intent, query):
         return run_tracker_workflow(query)
     elif intent == "precommit_review":
         return run_precommit_review(query)
+
+    elif intent == "daily_report":
+        return daily_code_sonar_report()
+
+    elif intent == "preview_daily_report":
+        return preview_daily_code_sonar_report()
+
+    elif intent == "send_daily_report":
+        return send_daily_code_sonar_report()
 
     else:
 

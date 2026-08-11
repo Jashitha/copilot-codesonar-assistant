@@ -1581,6 +1581,17 @@ _JS = """
       });
   }
 
+  function openOwnerDrilldownFromUrl() {
+    var params = new URLSearchParams(window.location.search || "");
+    var owner = params.get("owner");
+    if (!owner) return;
+    var known = (DATA.owners || []).some(function (row) { return row.owner === owner; });
+    if (!known) return;
+    var ownerPage = document.querySelector('.nav-item[data-page="owners"]');
+    if (ownerPage) ownerPage.click();
+    openOwnerDrilldown(owner);
+  }
+
   function renderFilesPage() {
     var files = DATA.charts.top_files || [];
     byId("files-tbody").innerHTML = files.map(function (f) {
@@ -1626,6 +1637,7 @@ _JS = """
     populateFilterOptions();
     renderTable();
     renderOwnersPage();
+    openOwnerDrilldownFromUrl();
     renderFilesPage();
     renderClassesPage();
     renderHotspotsPage();

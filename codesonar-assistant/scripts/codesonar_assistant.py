@@ -12,6 +12,7 @@ import pandas as pd
 
 from intent import detect_intent
 from dispatcher import dispatch
+from email_report import daily_code_sonar_report, preview_daily_code_sonar_report, send_daily_code_sonar_report
 from filters import filter_high_priority
 from env_bootstrap import ensure_env_file
 
@@ -333,7 +334,8 @@ def main():
 
     parser.add_argument(
         "--input",
-        required=True,
+        required=False,
+        default=str(TASK_DIR / "output" / "Master_Tracker.xlsx"),
         help="Path to Master_Tracker.xlsx or CodeSonar CSV",
     )
 
@@ -355,6 +357,30 @@ def main():
     intent = detect_intent(args.query)
 
     source = None
+    email_intents = {"daily_report", "preview_daily_report", "send_daily_report"}
+
+    if intent in email_intents:
+        if intent == "daily_report":
+            response = daily_code_sonar_report(TASK_DIR)
+        elif intent == "preview_daily_report":
+            response = preview_daily_code_sonar_report(TASK_DIR)
+        else:
+            response = send_daily_code_sonar_report(TASK_DIR)
+        payload = {
+            "source": str(TASK_DIR / "output" / "Master_Tracker.xlsx"),
+            "answer": response["answer"],
+            "count": response["count"],
+            "rows": response["rows"],
+        }
+        if args.format == "json":
+            print(json.dumps(payload, indent=2))
+        else:
+            print(f"Source : {payload['source']}")
+            print(payload["answer"])
+            if payload["rows"]:
+                print(json.dumps(payload["rows"], indent=2))
+        return
+
     if intent == "dashboard":
         dashboard_tracker = TASK_DIR / "output" / "Master_Tracker.xlsx"
         try:
@@ -383,6 +409,8 @@ def main():
         except Exception as exc:
             print(f"[warn] Dashboard generation skipped: {exc}", file=sys.stderr)
     else:
+        if not args.input:
+            args.input = str(TASK_DIR / "output" / "Master_Tracker.xlsx")
         df, source = load_input(args.input)
 
     response = answer(df, args.query, intent=intent)

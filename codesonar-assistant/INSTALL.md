@@ -59,3 +59,39 @@ The assistant is project-generic and supports both C and C++ CodeSonar projects.
 ## 6. Restart VS Code
 
 Restart VS Code so new agent/customization settings are picked up.
+
+
+## 7. Configure Daily Email Reports
+
+To enable daily email summaries, add the following values to `.env`:
+
+- `EMAIL_ENABLED=true`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `EMAIL_FROM`
+- `EMAIL_TO`
+- Optional: `EMAIL_CC`, `EMAIL_BCC`
+- Optional owner-specific routing: `OWNER_EMAILS_JSON`
+- Optional dashboard/tracker quick links: `EMAIL_DASHBOARD_URL`, `EMAIL_MASTER_TRACKER_URL`, `EMAIL_HB_PRIO_1_URL`
+
+Generate the report without sending mail:
+
+```bash
+python3 scripts/codesonar_assistant.py --query "Daily CodeSonar Report"
+```
+
+Preview the report first:
+
+```bash
+python3 scripts/codesonar_assistant.py --query "Preview Daily CodeSonar Report"
+```
+
+Send the report after validating the output:
+
+```bash
+python3 scripts/codesonar_assistant.py --query "Send Daily CodeSonar Report"
+```
+
+The generated files are stored under `output/email/`, including the HTML report, a plain-text fallback, and `email_history.log`. If email delivery fails, check SMTP connectivity and the log file, but avoid storing secrets in logs.

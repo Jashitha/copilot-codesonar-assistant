@@ -36,6 +36,7 @@ When used as a reusable team assistant, it prioritizes these workflows in order:
 - CSV Export
 - Print Dashboard
 - Dashboard automatically generated after Update Tracker
+- Automated Daily Email Reports
 
 ## How It Works
 
@@ -247,6 +248,30 @@ The dashboard provides:
 - Dark/Light Theme
 - CSV Export
 - Print Support
+
+## Daily Email Reports
+
+CodeSonar Assistant can generate a concise management email after the daily tracker and dashboard are ready. The email uses the same dashboard data as the Interactive Dashboard, so totals and owner counts stay aligned.
+
+Use these commands:
+
+- `Daily CodeSonar Report` generates the same HTML report without sending mail.
+- `Preview Daily CodeSonar Report` generates `output/email/Daily_CodeSonar_Report.html` and `output/email/Daily_CodeSonar_Report.txt` without sending anything.
+- `Send Daily CodeSonar Report` generates the report, validates email settings, and sends the email when SMTP configuration is enabled.
+
+The report includes:
+
+- Project header with project, branch, analysis time, and status
+- KPI summary cards
+- Owner-wise status table
+- Action Required section
+- Top hotspot files
+- Trend summary when history or snapshots are available
+- Quick links to the dashboard, tracker, and configured filtered views
+
+Owner-specific email delivery is optional and is configured with `OWNER_EMAILS_JSON`.
+
+![Daily Email Report](docs/images/email-report.svg)
 
 ## Dashboard Preview
 
