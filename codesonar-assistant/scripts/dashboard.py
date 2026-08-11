@@ -266,58 +266,122 @@ def _build_top_files(df: pd.DataFrame, limit: int = 10) -> list[dict]:
     return [{"label": k, "value": int(v)} for k, v in counts.items()]
 
 
-def _build_owner_workload(df: pd.DataFrame, configured_owners: list[str] | None = None) -> list[dict]:
-    counts = df["Owner"].value_counts().to_dict()
-    rows = []
-    seen = set()
-    for owner in configured_owners or []:
-        rows.append({"label": owner, "value": int(counts.get(owner, 0))})
-        seen.add(owner)
-    for owner, count in counts.items():
-        if owner not in seen:
-            rows.append({"label": owner, "value": int(count)})
-    return rows
+def _owner_row(owner: str, group: pd.DataFrame | None) -> dict:
+    """Build one Owner Dashboard row from the (possibly empty) group of
+    tracker rows assigned to `owner`. Shared by every configured/derived
+    owner so the metrics are computed identically for all of them."""
+    if group is None or not len(group):
+        return {
+            "owner": owner,
+            "assigned": 0,
+            "pending": 0,
+            "done": 0,
+            "hb_prio_1": 0,
+            "hb_prio_2": 0,
+            "completion_pct": 0.0,
+        }
+    assigned = len(group)
+    done = int((group["Status"].str.lower() == "done").sum())
+    pending = int((group["Status"].str.lower() == "pending").sum())
+    hb1 = int((group[COL_PRIORITY] == "HB_PRIO_1").sum()) if COL_PRIORITY in group.columns else 0
+    hb2 = int((group[COL_PRIORITY] == "HB_PRIO_2").sum()) if COL_PRIORITY in group.columns else 0
+    return {
+        "owner": owner,
+        "assigned": assigned,
+        "pending": pending,
+        "done": done,
+        "hb_prio_1": hb1,
+        "hb_prio_2": hb2,
+        "completion_pct": _completion_pct(done, assigned),
+    }
 
 
 def _build_owners(df: pd.DataFrame, configured_owners: list[str] | None = None) -> list[dict]:
+    """Per-owner metrics for the Owner Dashboard table. Every owner value
+    actually present in Master_Tracker.xlsx's Owner column is included
+    (never hardcoded), plus any configured-but-currently-unused owners so
+    they remain visible with a 0 count."""
     rows = []
     grouped = {owner: group for owner, group in df.groupby("Owner")}
     seen = set()
 
     for owner in configured_owners or []:
-        group = grouped.get(owner)
-        assigned = len(group) if group is not None else 0
-        done = int((group["Status"].str.lower() == "done").sum()) if group is not None else 0
-        pending = int((group["Status"].str.lower() == "pending").sum()) if group is not None else 0
-        rows.append(
-            {
-                "owner": owner,
-                "assigned": assigned,
-                "pending": pending,
-                "done": done,
-                "completion_pct": _completion_pct(done, assigned),
-            }
-        )
+        rows.append(_owner_row(owner, grouped.get(owner)))
         seen.add(owner)
 
     for owner, group in grouped.items():
         if owner in seen:
             continue
-        assigned = len(group)
-        done = int((group["Status"].str.lower() == "done").sum())
-        pending = int((group["Status"].str.lower() == "pending").sum())
-        rows.append(
-            {
-                "owner": owner,
-                "assigned": assigned,
-                "pending": pending,
-                "done": done,
-                "completion_pct": _completion_pct(done, assigned),
-            }
-        )
+        rows.append(_owner_row(owner, group))
 
     rows.sort(key=lambda r: r["assigned"], reverse=True)
     return rows
+
+
+def _build_owner_workload(owners: list[dict]) -> list[dict]:
+    """Owner Workload chart series, derived directly from _build_owners()'s
+    output (rather than recomputed from the raw dataframe) so the chart and
+    the Owner Dashboard table are guaranteed to show identical numbers."""
+    return [{"label": o["owner"], "value": o["assigned"]} for o in owners]
+
+
+def _raw_owner_populated_count(tracker_path: Path) -> int:
+    """Independent, pre-normalization read of Master_Tracker.xlsx's raw
+    owner column, used only for anomaly detection in
+    _build_owner_validation() — never used to compute dashboard metrics."""
+    try:
+        raw = pd.read_excel(tracker_path, sheet_name="Details", usecols=[COL_OWNER])
+    except Exception:
+        try:
+            raw = pd.read_excel(tracker_path, usecols=[COL_OWNER])
+        except Exception:
+            return 0
+    if COL_OWNER not in raw.columns:
+        return 0
+    values = raw[COL_OWNER].astype(str).str.strip()
+    populated = ~values.str.lower().isin(["", "nan", "unassigned", "none"])
+    return int(populated.sum())
+
+
+def _build_owner_validation(df: pd.DataFrame, owners: list[dict], tracker_path: Path) -> dict:
+    """Reconciliation totals + safety-net warnings for the Owner Dashboard.
+
+    Confirms assigned + unassigned == total findings, and flags the specific
+    anomaly of Master_Tracker.xlsx containing populated Owner values while
+    the dashboard computed zero assigned findings (a pipeline bug signal,
+    not a valid 'nobody is assigned yet' state).
+    """
+    total = len(df)
+    unassigned = int((df["Owner"] == "Unassigned").sum())
+    assigned_total = sum(o["assigned"] for o in owners if o["owner"] != "Unassigned")
+    owners_total = sum(o["assigned"] for o in owners)
+
+    warnings: list[str] = []
+
+    if owners_total != total:
+        warnings.append(
+            f"Owner Dashboard totals do not reconcile: owner rows sum to {owners_total} but "
+            f"Master_Tracker.xlsx has {total} finding(s)."
+        )
+    if assigned_total + unassigned != total:
+        warnings.append(
+            f"Assigned ({assigned_total}) + Unassigned ({unassigned}) does not equal Total Findings ({total})."
+        )
+
+    raw_populated = _raw_owner_populated_count(tracker_path)
+    if raw_populated > 0 and assigned_total == 0:
+        warnings.append(
+            f"Master_Tracker.xlsx has {raw_populated} finding(s) with a populated Owner value, "
+            "but the dashboard computed 0 assigned findings — check the Owner column mapping."
+        )
+
+    return {
+        "total_findings": total,
+        "assigned_total": assigned_total,
+        "unassigned_total": unassigned,
+        "reconciled": (owners_total == total) and (assigned_total + unassigned == total),
+        "warnings": warnings,
+    }
 
 
 def _build_hotspots(df: pd.DataFrame, limit: int = 10) -> list[dict]:
@@ -646,6 +710,10 @@ def build_dashboard_data(tracker_path: Path, history_path: Path) -> dict:
     project_health = _build_project_health(release_readiness, compliance)
     recommendations = _build_recommendations(gates, compliance, hotspots)
 
+    owners = _build_owners(df, configured_owners)
+    owner_workload = _build_owner_workload(owners)
+    owner_validation = _build_owner_validation(df, owners, tracker_path)
+
     meta = _build_project_meta(task_dir, tracker_path)
     meta.update(project_health)
 
@@ -665,10 +733,11 @@ def build_dashboard_data(tracker_path: Path, history_path: Path) -> dict:
             "priority_distribution": _build_priority_distribution(df),
             "class_distribution": class_chart,
             "top_files": _build_top_files(df, limit=10),
-            "owner_workload": _build_owner_workload(df, configured_owners),
+            "owner_workload": owner_workload,
         },
         "classes": class_full,
-        "owners": _build_owners(df, configured_owners),
+        "owners": owners,
+        "owner_validation": owner_validation,
         "configuration": {
             "owners": configured_owners,
             "reviewers": configured_reviewers,
@@ -827,6 +896,22 @@ tbody tr:hover { background: var(--bg-secondary); }
 
 .pagination { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; }
 
+/* Owner Dashboard drill-down */
+.hint-text { font-size: 12px; color: var(--text-muted); margin: 8px 0; }
+.owner-validation-banner .validation-warning {
+  background: rgba(207,34,46,0.10);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.owner-drilldown { display: none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+.owner-drilldown.open { display: block; }
+.owner-drilldown-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.owner-drilldown-header h3 { margin: 0; font-size: 15px; }
+.owner-drilldown .exec-summary { margin-bottom: 12px; }
+
 /* Modal */
 .modal-overlay {
   display: none;
@@ -969,6 +1054,7 @@ _JS = """
     search: "",
     page: 0,
     pageSize: 25,
+    ownerDrilldown: { owner: null, filters: { priority: "", class: "", status: "" } },
   };
 
   function byId(id) { return document.getElementById(id); }
@@ -1312,11 +1398,144 @@ _JS = """
   }
 
   // ---- Owners / Files / Classes / Hotspots pages --------------------------
+  function renderOwnerValidationBanner() {
+    var el = byId("owner-validation-banner");
+    if (!el) return;
+    var warnings = (DATA.owner_validation && DATA.owner_validation.warnings) || [];
+    if (!warnings.length) {
+      el.innerHTML = "";
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "block";
+    el.innerHTML = warnings.map(function (w) {
+      return '<div class="validation-warning">\u26A0 ' + escapeHtml(w) + "</div>";
+    }).join("");
+  }
+
   function renderOwnersPage() {
     var owners = DATA.owners || [];
+    renderOwnerValidationBanner();
     byId("owners-tbody").innerHTML = owners.map(function (o) {
-      return "<tr><td>" + escapeHtml(o.owner) + "</td><td>" + escapeHtml(o.assigned) + "</td><td>" + escapeHtml(o.pending) + "</td><td>" + escapeHtml(o.done) + "</td><td>" + escapeHtml(o.completion_pct) + "%</td></tr>";
-    }).join("") || '<tr><td colspan="5"><div class="empty-state">No owner data available.</div></td></tr>';
+      return "<tr data-owner='" + escapeHtml(o.owner) + "'>" +
+        "<td>" + escapeHtml(o.owner) + "</td>" +
+        "<td>" + escapeHtml(o.assigned) + "</td>" +
+        "<td>" + escapeHtml(o.hb_prio_1) + "</td>" +
+        "<td>" + escapeHtml(o.hb_prio_2) + "</td>" +
+        "<td>" + escapeHtml(o.pending) + "</td>" +
+        "<td>" + escapeHtml(o.done) + "</td>" +
+        "<td>" + escapeHtml(o.completion_pct) + "%</td>" +
+      "</tr>";
+    }).join("") || '<tr><td colspan="7"><div class="empty-state">No owner data available.</div></td></tr>';
+
+    Array.prototype.forEach.call(byId("owners-tbody").querySelectorAll("tr[data-owner]"), function (tr) {
+      tr.addEventListener("click", function () { openOwnerDrilldown(tr.dataset.owner); });
+    });
+  }
+
+  function getOwnerFindings(owner) {
+    return (DATA.findings || []).filter(function (f) { return f.owner === owner; });
+  }
+
+  function getFilteredOwnerFindings() {
+    var owner = state.ownerDrilldown.owner;
+    var f = state.ownerDrilldown.filters;
+    return getOwnerFindings(owner).filter(function (row) {
+      if (f.priority && row.priority !== f.priority) return false;
+      if (f.class && row.class !== f.class) return false;
+      if (f.status && row.status !== f.status) return false;
+      return true;
+    });
+  }
+
+  function renderOwnerDrilldownSummary() {
+    var owner = state.ownerDrilldown.owner;
+    var row = (DATA.owners || []).find(function (o) { return o.owner === owner; }) || {
+      owner: owner, assigned: 0, pending: 0, done: 0, hb_prio_1: 0, hb_prio_2: 0, completion_pct: 0,
+    };
+    byId("owner-drilldown-summary").innerHTML = [
+      ["Owner", row.owner],
+      ["Total Assigned", row.assigned],
+      ["Pending", row.pending],
+      ["Done", row.done],
+      ["HB_PRIO_1", row.hb_prio_1],
+      ["HB_PRIO_2", row.hb_prio_2],
+      ["Completion %", row.completion_pct + "%"],
+    ].map(function (pair) {
+      return '<div class="meta-item"><div class="label">' + escapeHtml(pair[0]) + '</div><div class="value">' + escapeHtml(pair[1]) + "</div></div>";
+    }).join("");
+  }
+
+  function populateOwnerDrilldownFilters() {
+    var rows = getOwnerFindings(state.ownerDrilldown.owner);
+    function uniqueValues(key) {
+      var vals = {};
+      rows.forEach(function (r) { if (r[key]) vals[r[key]] = true; });
+      return Object.keys(vals).sort();
+    }
+    [["owner-drilldown-filter-priority", "priority", "Priority"], ["owner-drilldown-filter-class", "class", "Class"], ["owner-drilldown-filter-status", "status", "Status"]]
+      .forEach(function (pair) {
+        var select = byId(pair[0]);
+        select.innerHTML = '<option value="">All ' + pair[2] + "</option>";
+        uniqueValues(pair[1]).forEach(function (v) {
+          var opt = document.createElement("option");
+          opt.value = v; opt.textContent = v;
+          select.appendChild(opt);
+        });
+        select.value = state.ownerDrilldown.filters[pair[1]] || "";
+      });
+  }
+
+  function renderOwnerDrilldownTable() {
+    var rows = getFilteredOwnerFindings();
+    var tbody = byId("owner-drilldown-tbody");
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state">No findings match the current filters.</div></td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(function (r) {
+        return "<tr data-id='" + escapeHtml(r.id) + "'>" +
+          "<td>" + escapeHtml(r.id) + "</td>" +
+          '<td><span class="badge ' + cssToken(r.priority) + '">' + escapeHtml(r.priority) + "</span></td>" +
+          "<td>" + escapeHtml(r.class) + "</td>" +
+          "<td>" + escapeHtml(r.owner) + "</td>" +
+          "<td>" + escapeHtml(r.file) + "</td>" +
+          "<td>" + escapeHtml(r.procedure) + "</td>" +
+          '<td><span class="badge ' + cssToken(r.status) + '">' + escapeHtml(r.status) + "</span></td>" +
+          "<td>" + escapeHtml(r.line_number) + "</td>" +
+          "<td>" + escapeHtml(r.finding) + "</td>" +
+        "</tr>";
+      }).join("");
+    }
+    Array.prototype.forEach.call(tbody.querySelectorAll("tr[data-id]"), function (tr) {
+      tr.addEventListener("click", function () { openModal(tr.dataset.id); });
+    });
+  }
+
+  function openOwnerDrilldown(owner) {
+    state.ownerDrilldown.owner = owner;
+    state.ownerDrilldown.filters = { priority: "", class: "", status: "" };
+    byId("owner-drilldown-title").textContent = "Findings for " + owner;
+    populateOwnerDrilldownFilters();
+    renderOwnerDrilldownSummary();
+    renderOwnerDrilldownTable();
+    byId("owner-drilldown").classList.add("open");
+    byId("owner-drilldown").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function closeOwnerDrilldown() {
+    byId("owner-drilldown").classList.remove("open");
+    state.ownerDrilldown.owner = null;
+  }
+
+  function initOwnerDrilldown() {
+    byId("owner-drilldown-close").addEventListener("click", closeOwnerDrilldown);
+    [["owner-drilldown-filter-priority", "priority"], ["owner-drilldown-filter-class", "class"], ["owner-drilldown-filter-status", "status"]]
+      .forEach(function (pair) {
+        byId(pair[0]).addEventListener("change", function (e) {
+          state.ownerDrilldown.filters[pair[1]] = e.target.value;
+          renderOwnerDrilldownTable();
+        });
+      });
   }
 
   function renderFilesPage() {
@@ -1352,6 +1571,7 @@ _JS = """
     initModal();
     initPagination();
     initExportPrint();
+    initOwnerDrilldown();
     renderMeta();
     renderSummary();
     renderQualityGates();
@@ -1486,11 +1706,39 @@ __DASHBOARD_CSS__
     <!-- 7. Owner Dashboard -->
     <section id="page-owners" class="page">
       <h2>Owner Dashboard</h2>
+      <div id="owner-validation-banner" class="owner-validation-banner" style="display:none;"></div>
       <div class="chart-box"><h3>Owner Workload</h3><canvas id="chart-owners"></canvas></div>
-      <table>
-        <thead><tr><th>Owner</th><th>Assigned</th><th>Pending</th><th>Done</th><th>Completion %</th></tr></thead>
-        <tbody id="owners-tbody"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Owner</th><th>Total Assigned</th><th>HB_PRIO_1</th><th>HB_PRIO_2</th><th>Pending</th><th>Done</th><th>Completion %</th>
+          </tr></thead>
+          <tbody id="owners-tbody"></tbody>
+        </table>
+      </div>
+      <p class="hint-text">Click an owner row to view their assigned findings.</p>
+
+      <div id="owner-drilldown" class="owner-drilldown">
+        <div class="owner-drilldown-header">
+          <h3 id="owner-drilldown-title">Findings for Owner</h3>
+          <button id="owner-drilldown-close" class="close-btn">Close</button>
+        </div>
+        <div id="owner-drilldown-summary" class="exec-summary"></div>
+        <div class="filters">
+          <select id="owner-drilldown-filter-priority"><option value="">All Priority</option></select>
+          <select id="owner-drilldown-filter-class"><option value="">All Class</option></select>
+          <select id="owner-drilldown-filter-status"><option value="">All Status</option></select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Issue ID</th><th>Priority</th><th>Issue Class</th><th>Owner</th>
+              <th>File</th><th>Procedure</th><th>Status</th><th>Line Number</th><th>Finding</th>
+            </tr></thead>
+            <tbody id="owner-drilldown-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <section id="page-files" class="page">
