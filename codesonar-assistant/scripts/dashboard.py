@@ -272,27 +272,36 @@ def _owner_row(owner: str, group: pd.DataFrame | None) -> dict:
     owner so the metrics are computed identically for all of them."""
     if group is None or not len(group):
         return {
+            "name": owner,
             "owner": owner,
+            "total_assigned": 0,
             "assigned": 0,
             "pending": 0,
             "done": 0,
             "hb_prio_1": 0,
             "hb_prio_2": 0,
+            "completion": 0.0,
             "completion_pct": 0.0,
+            "findings": [],
         }
     assigned = len(group)
     done = int((group["Status"].str.lower() == "done").sum())
     pending = int((group["Status"].str.lower() == "pending").sum())
     hb1 = int((group[COL_PRIORITY] == "HB_PRIO_1").sum()) if COL_PRIORITY in group.columns else 0
     hb2 = int((group[COL_PRIORITY] == "HB_PRIO_2").sum()) if COL_PRIORITY in group.columns else 0
+    completion = _completion_pct(done, assigned)
     return {
+        "name": owner,
         "owner": owner,
+        "total_assigned": assigned,
         "assigned": assigned,
         "pending": pending,
         "done": done,
         "hb_prio_1": hb1,
         "hb_prio_2": hb2,
-        "completion_pct": _completion_pct(done, assigned),
+        "completion": completion,
+        "completion_pct": completion,
+        "findings": [],
     }
 
 
@@ -322,7 +331,40 @@ def _build_owner_workload(owners: list[dict]) -> list[dict]:
     """Owner Workload chart series, derived directly from _build_owners()'s
     output (rather than recomputed from the raw dataframe) so the chart and
     the Owner Dashboard table are guaranteed to show identical numbers."""
-    return [{"label": o["owner"], "value": o["assigned"]} for o in owners]
+    return [{"label": o["name"], "value": o["total_assigned"]} for o in owners]
+
+
+def _build_owner_findings(owner: str, findings: list[dict]) -> list[dict]:
+    """Owner-scoped findings payload for the drill-down view.
+
+    Keeps the dashboard JSON self-contained so the owner row, chart, and
+    drill-down can all be derived from the same generated data.
+    """
+    rows = []
+    for finding in findings:
+        if finding.get("owner") != owner:
+            continue
+        rows.append(
+            {
+                "issue_id": finding.get("id", ""),
+                "priority": finding.get("priority", ""),
+                "issue_class": finding.get("class", ""),
+                "owner": finding.get("owner", owner),
+                "file": finding.get("file", ""),
+                "procedure": finding.get("procedure", ""),
+                "status": finding.get("status", ""),
+                "line_number": finding.get("line_number", 0),
+                "message": finding.get("finding", ""),
+                "finding": finding.get("finding", ""),
+            }
+        )
+    return rows
+
+
+def _attach_owner_findings(owners: list[dict], findings: list[dict]) -> list[dict]:
+    for row in owners:
+        row["findings"] = _build_owner_findings(row["name"], findings)
+    return owners
 
 
 def _raw_owner_populated_count(tracker_path: Path) -> int:
@@ -711,6 +753,7 @@ def build_dashboard_data(tracker_path: Path, history_path: Path) -> dict:
     recommendations = _build_recommendations(gates, compliance, hotspots)
 
     owners = _build_owners(df, configured_owners)
+    owners = _attach_owner_findings(owners, findings)
     owner_workload = _build_owner_workload(owners)
     owner_validation = _build_owner_validation(df, owners, tracker_path)
 
@@ -1843,6 +1886,17 @@ def generate_dashboard(task_dir: Path | None = None) -> dict:
     dashboard_dir.mkdir(parents=True, exist_ok=True)
 
     data = build_dashboard_data(tracker_path, history_path)
+
+    owner_validation = data.get("owner_validation", {})
+    print("Owner Distribution:")
+    for owner in data.get("owners", []):
+        print(f"{owner.get('name', owner.get('owner', 'Unassigned'))} : {owner.get('total_assigned', owner.get('assigned', 0))}")
+
+    warnings = owner_validation.get("warnings", []) if isinstance(owner_validation, dict) else []
+    if warnings:
+        for warning in warnings:
+            print(f"WARNING: {warning}")
+        raise ValueError("Owner dashboard validation failed; dashboard_data.json was not written.")
 
     data_json_path = dashboard_dir / "dashboard_data.json"
     data_json_path.write_text(
