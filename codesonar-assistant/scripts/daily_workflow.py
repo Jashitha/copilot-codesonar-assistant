@@ -332,14 +332,14 @@ def _existing_reviewer_pool(master_df: pd.DataFrame) -> list[str]:
     return [r for r in reviewers if r.lower() != "unassigned"]
 
 
-def _assign_new_issues(updated_df: pd.DataFrame, new_issue_ids: Iterable[str], owners: list[str]) -> None:
-    """Assign owners for newly introduced IDs currently unassigned."""
+def _assign_owner_round_robin(updated_df: pd.DataFrame, issue_ids: Iterable[str], owners: list[str]) -> None:
+    """Assign owners to the selected issue IDs using a least-loaded round-robin."""
 
     if not owners:
         return
 
-    new_ids = {str(item).strip() for item in new_issue_ids}
-    if not new_ids:
+    target_ids = {str(item).strip() for item in issue_ids}
+    if not target_ids:
         return
 
     if "Owner" not in updated_df.columns:
@@ -353,7 +353,7 @@ def _assign_new_issues(updated_df: pd.DataFrame, new_issue_ids: Iterable[str], o
 
     for idx, row in updated_df.iterrows():
         issue_id = str(row.get("id", "")).strip()
-        if issue_id not in new_ids:
+        if issue_id not in target_ids:
             continue
 
         current_owner = str(row.get("Owner", "")).strip()
@@ -363,6 +363,30 @@ def _assign_new_issues(updated_df: pd.DataFrame, new_issue_ids: Iterable[str], o
         selected_owner = min(owners, key=lambda o: owner_counts[o])
         updated_df.at[idx, "Owner"] = selected_owner
         owner_counts[selected_owner] += 1
+
+
+def _assign_new_issues(updated_df: pd.DataFrame, new_issue_ids: Iterable[str], owners: list[str]) -> None:
+    """Assign owners for newly introduced IDs currently unassigned."""
+
+    _assign_owner_round_robin(updated_df, new_issue_ids, owners)
+
+
+def _assign_unassigned_issues(updated_df: pd.DataFrame, owners: list[str]) -> int:
+    """Backfill all currently Unassigned owner rows when an owner pool exists.
+
+    Returns the number of rows that were eligible for assignment.
+    """
+
+    if not owners or "Owner" not in updated_df.columns:
+        return 0
+
+    unassigned_mask = updated_df["Owner"].astype(str).str.strip().str.lower().isin(["", "unassigned", "nan", "none"])
+    unassigned_ids = updated_df.loc[unassigned_mask, "id"].astype(str).tolist()
+    if not unassigned_ids:
+        return 0
+
+    _assign_owner_round_robin(updated_df, unassigned_ids, owners)
+    return len(unassigned_ids)
 
 
 def _assign_reviewers(updated_df: pd.DataFrame, new_issue_ids: Iterable[str], reviewers: list[str], fill_unassigned: bool = False) -> None:
@@ -651,6 +675,12 @@ def run_daily_workflow(args: argparse.Namespace) -> int:
 
         new_ids_list = new_df["id"].astype(str).tolist()
         _assign_new_issues(updated_df, new_ids_list, owner_pool)
+        if owner_pool:
+            existing_assigned = int(
+                updated_df["Owner"].astype(str).str.strip().str.lower().ne("unassigned").sum()
+            )
+            if existing_assigned == 0:
+                _assign_unassigned_issues(updated_df, owner_pool)
         _assign_reviewers(updated_df, new_ids_list, reviewer_pool, fill_unassigned=bool(explicit_rev))
 
         # Count what was actually assigned
@@ -675,6 +705,11 @@ def run_daily_workflow(args: argparse.Namespace) -> int:
         all_ids = final_df["id"].astype(str).tolist()
         if owner_pool:
             _assign_new_issues(final_df, all_ids, owner_pool)
+            existing_assigned = int(
+                final_df["Owner"].astype(str).str.strip().str.lower().ne("unassigned").sum()
+            )
+            if existing_assigned == 0:
+                _assign_unassigned_issues(final_df, owner_pool)
         if reviewer_pool:
             _assign_reviewers(final_df, all_ids, reviewer_pool, fill_unassigned=True)
 
