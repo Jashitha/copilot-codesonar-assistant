@@ -20,13 +20,13 @@ def detect_intent(query: str) -> str:
         "send daily codesonar report" in q
         or "send daily email report" in q
         or "send daily report" in q
+        or "daily email report" in q
     ):
         return "send_daily_report"
 
     if (
         "daily codesonar report" in q
         or "daily code sonar report" in q
-        or "daily email report" in q
     ):
         return "daily_report"
 

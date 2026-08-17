@@ -5,6 +5,8 @@ import html
 import json
 import os
 import re
+import mimetypes
+import shutil
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
@@ -42,9 +44,12 @@ def _bool(name: str, env: dict[str, str], default: bool = False) -> bool:
     return _env(name, env, '1' if default else '0').strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
+def _split_recipients(raw: str) -> list[str]:
+    return [item.strip() for item in re.split(r'[;,\n]+', raw or '') if item.strip()]
+
+
 def _list(name: str, env: dict[str, str]) -> list[str]:
-    raw = _env(name, env, '')
-    return [item.strip() for item in raw.split(',') if item.strip()]
+    return _split_recipients(_env(name, env, ''))
 
 
 def _json_map(name: str, env: dict[str, str]) -> dict[str, str]:
@@ -64,6 +69,16 @@ def _slug(value: str) -> str:
 
 def _esc(value) -> str:
     return html.escape(str(value if value is not None else ''), quote=True)
+
+
+def _format_analysis_stamp(value: str | None) -> str:
+    raw = str(value or '').strip()
+    for fmt in ('%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S', '%d %b %Y, %H:%M'):
+        try:
+            return datetime.strptime(raw, fmt).strftime('%d %b %Y, %H:%M')
+        except ValueError:
+            continue
+    return raw or datetime.now().strftime('%d %b %Y, %H:%M')
 
 
 def _load_dashboard_data(task_dir: Path) -> dict:
@@ -192,19 +207,20 @@ def _owner_rows(data: dict, owner: str | None = None) -> list[dict]:
     return rows
 
 
-def _dashboard_url(env: dict[str, str], owner: str | None = None) -> str | None:
+def _dashboard_url(env: dict[str, str], owner: str | None = None, link_base: str = '.') -> str | None:
     url = _env('EMAIL_DASHBOARD_URL', env, '').strip()
     if not url:
-        return None
+        prefix = '' if link_base in {'', '.'} else link_base.rstrip('/') + '/'
+        url = f'{prefix}dashboard/index.html'
     if owner:
         separator = '&' if '?' in url else '?'
         return f'{url}{separator}owner={quote_plus(owner)}'
     return url
 
 
-def _quick_links(env: dict[str, str], owner: str | None = None) -> list[tuple[str, str]]:
+def _quick_links(env: dict[str, str], owner: str | None = None, link_base: str = '.') -> list[tuple[str, str]]:
     links: list[tuple[str, str]] = []
-    dashboard_url = _dashboard_url(env, owner)
+    dashboard_url = _dashboard_url(env, owner, link_base=link_base)
     if dashboard_url:
         links.append(('Interactive Dashboard', dashboard_url))
         if owner:
@@ -218,11 +234,71 @@ def _quick_links(env: dict[str, str], owner: str | None = None) -> list[tuple[st
     return links
 
 
+def _normalize_token(value: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '', value.lower())
+
+
 def _owner_email_map(env: dict[str, str]) -> dict[str, str]:
+    raw = _env('OWNER_EMAILS_JSON', env, '').strip()
+    if not raw:
+        return {}
     try:
         return _json_map('OWNER_EMAILS_JSON', env)
     except Exception:
-        return {}
+        owners = _configured_owner_names(env)
+        entries = [item.strip() for item in raw.split(',') if item.strip()]
+        if not entries:
+            return {}
+        mapping: dict[str, str] = {}
+        remaining = entries[:] 
+
+        for owner in owners:
+            owner_key = _normalize_token(owner)
+            match_index = None
+            for index, email in enumerate(remaining):
+                email_key = _normalize_token(email)
+                local_part = _normalize_token(email.split('@', 1)[0])
+                if owner_key and (owner_key in email_key or owner_key in local_part):
+                    match_index = index
+                    break
+            if match_index is not None:
+                mapping[owner] = remaining.pop(match_index)
+
+        unmatched_owners = [owner for owner in owners if owner not in mapping]
+        for owner, email in zip(unmatched_owners, remaining):
+            mapping[owner] = email
+
+        if len(mapping) < len(owners):
+            for owner in owners:
+                if owner not in mapping:
+                    mapping[owner] = ''
+        return {owner: email for owner, email in mapping.items() if email}
+
+
+def _configured_owner_names(env: dict[str, str]) -> list[str]:
+    return _list('CODESONAR_OWNERS', env)
+
+
+def _recipient_config(env: dict[str, str]) -> tuple[list[str], list[str], list[str], list[str]]:
+    owners = _configured_owner_names(env)
+    owner_map = _owner_email_map(env)
+    team_email = _env('CODESONAR_TEAM_EMAIL', env, '').strip()
+
+    issues: list[str] = []
+    if not owners:
+        issues.append('CODESONAR_OWNERS is not configured.')
+    missing = [owner for owner in owners if owner not in owner_map]
+    if missing:
+        issues.append('Missing OWNER_EMAILS_JSON mappings for: ' + ', '.join(missing))
+
+    to_recipients = [owner_map[owner] for owner in owners if owner in owner_map]
+    cc_recipients = [team_email] if team_email else []
+
+    invalid = [recipient for recipient in to_recipients + cc_recipients if '@' not in recipient or recipient.startswith('@') or recipient.endswith('@')]
+    if invalid:
+        issues.append('Invalid recipient address(es): ' + ', '.join(sorted(set(invalid))))
+
+    return to_recipients, cc_recipients, [], issues
 
 
 def _write_report_files(name: str, html_body: str, text_body: str) -> tuple[Path, Path]:
@@ -249,67 +325,9 @@ def _append_log(scope: str, mode: str, status: str, recipients: list[str], error
         fh.write(json.dumps(payload, ensure_ascii=False) + '\n')
 
 
-def _smtp_config(env: dict[str, str]) -> dict[str, str | list[str] | bool]:
-    return {
-        'enabled': _bool('EMAIL_ENABLED', env, False),
-        'host': _env('SMTP_HOST', env, '').strip(),
-        'port': _env('SMTP_PORT', env, '').strip(),
-        'username': _env('SMTP_USERNAME', env, '').strip(),
-        'password': _env('SMTP_PASSWORD', env, '').strip(),
-        'from': _env('EMAIL_FROM', env, '').strip(),
-        'to': _list('EMAIL_TO', env),
-        'cc': _list('EMAIL_CC', env),
-        'bcc': _list('EMAIL_BCC', env),
-    }
-
-
-def _validate_send_config(config: dict[str, str | list[str] | bool]) -> list[str]:
-    issues: list[str] = []
-    if not config['enabled']:
-        issues.append('EMAIL_ENABLED is false.')
-    if not config['host']:
-        issues.append('SMTP_HOST is not configured.')
-    if not config['port']:
-        issues.append('SMTP_PORT is not configured.')
-    if not config['from']:
-        issues.append('EMAIL_FROM is not configured.')
-    if not config['to']:
-        issues.append('EMAIL_TO is not configured.')
-    if bool(config['username']) ^ bool(config['password']):
-        issues.append('SMTP_USERNAME and SMTP_PASSWORD must both be set or both be empty.')
-    return issues
-
-
-def _send_email(config: dict[str, str | list[str] | bool], subject: str, html_body: str, text_body: str) -> None:
-    message = EmailMessage()
-    message['Subject'] = subject
-    message['From'] = str(config['from'])
-    message['To'] = ', '.join(config['to'])
-    if config['cc']:
-        message['Cc'] = ', '.join(config['cc'])
-    message.set_content(text_body)
-    message.add_alternative(html_body, subtype='html')
-
-    port = int(str(config['port']))
-    recipients = list(config['to']) + list(config['cc']) + list(config['bcc'])
-    if port == 465:
-        with smtplib.SMTP_SSL(str(config['host']), port, timeout=30) as smtp:
-            if config['username']:
-                smtp.login(str(config['username']), str(config['password']))
-            smtp.send_message(message, from_addr=str(config['from']), to_addrs=recipients)
-        return
-
-    with smtplib.SMTP(str(config['host']), port, timeout=30) as smtp:
-        smtp.ehlo()
-        if port in {587, 25}:
-            try:
-                smtp.starttls()
-                smtp.ehlo()
-            except smtplib.SMTPException:
-                pass
-        if config['username']:
-            smtp.login(str(config['username']), str(config['password']))
-        smtp.send_message(message, from_addr=str(config['from']), to_addrs=recipients)
+def _email_backend(env: dict[str, str]) -> str:
+    backend = _env('EMAIL_BACKEND', env, 'smtp').strip().lower()
+    return backend or 'smtp'
 
 
 def _table(headers: list[str], rows: list[list[str]]) -> str:
@@ -318,7 +336,7 @@ def _table(headers: list[str], rows: list[list[str]]) -> str:
     return '<table>' + '<tr>' + head + '</tr>' + body + '</table>'
 
 
-def _render_report(data: dict, env: dict[str, str], owner: str | None = None) -> tuple[str, str, str]:
+def _render_report(data: dict, env: dict[str, str], owner: str | None = None, link_base: str = '.') -> tuple[str, str, str]:
     current = _current_metrics(data)
     prev_path = _previous_snapshot(TASK_DIR)
     previous = _snapshot_metrics(prev_path) if prev_path else None
@@ -329,23 +347,24 @@ def _render_report(data: dict, env: dict[str, str], owner: str | None = None) ->
     project_name = meta.get('project_name') or TASK_DIR.name
     branch = meta.get('branch') or 'n/a'
     analysis_date = meta.get('analysis_date') or datetime.now().strftime('%d %b %Y')
+    analysis_display = _format_analysis_stamp(meta.get('analysis_date'))
 
     if owner:
         owner_rows = _owner_rows(data, owner)
         if not owner_rows:
             raise ValueError(f"Owner '{owner}' not found in dashboard data.")
         owner_row = owner_rows[0]
-        subject = f"CodeSonar Daily Report | {owner} | {int(owner_row.get('hb_prio_1', 0))} HB_PRIO_1 | {int(owner_row.get('total_assigned', owner_row.get('assigned', 0)))} Total Findings"
+        subject = f"Daily CodeSonar Report | {owner} | {analysis_display}"
         hotspots = _top_hotspots(data, owner=owner)
         action_findings = _top_action_findings(data, owner=owner)
-        quick_links = _quick_links(env, owner)
+        quick_links = _quick_links(env, owner, link_base=link_base)
         owner_caption = f'{owner} receives only assigned findings.'
         action_title = 'Highest-Priority Findings'
     else:
-        subject = f"CodeSonar Daily Analysis | {project_name} | {('Attention Required' if status_code != 'green' else 'All Clear')} | {analysis_date}"
+        subject = f"Daily CodeSonar Report | {project_name} | {analysis_display}"
         hotspots = _top_hotspots(data)
         action_findings = _top_action_findings(data)
-        quick_links = _quick_links(env, None)
+        quick_links = _quick_links(env, None, link_base=link_base)
         owner_caption = 'Use the Interactive Dashboard for detailed drill-downs.'
         action_title = 'Action Required'
 
@@ -364,7 +383,7 @@ def _render_report(data: dict, env: dict[str, str], owner: str | None = None) ->
     owner_table_rows = []
     for row in owner_rows:
         owner_name = row.get('name') or row.get('owner') or 'Unassigned'
-        dashboard_url = _dashboard_url(env, owner_name)
+        dashboard_url = _dashboard_url(env, owner_name, link_base='../../')
         button = f'<a class="button" href="{_esc(dashboard_url)}">View Owner Findings</a>' if dashboard_url else '<span class="muted">Dashboard link not configured</span>'
         owner_table_rows.append([
             _esc(owner_name),
@@ -512,6 +531,15 @@ def _render_report(data: dict, env: dict[str, str], owner: str | None = None) ->
     return subject, html_body, '\n'.join(text_lines) + '\n'
 
 
+def _mirror_dashboard_preview(task_dir: Path) -> None:
+    source = task_dir / 'output' / 'dashboard' / 'index.html'
+    if not source.exists():
+        return
+    target = task_dir / 'output' / 'email' / 'Interactive_Dashboard.html'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+
+
 def _run_report(task_dir: Path | None = None, preview: bool = False) -> dict:
     task_dir = Path(task_dir) if task_dir else TASK_DIR
     tracker_path = task_dir / 'output' / 'Master_Tracker.xlsx'
@@ -541,6 +569,7 @@ def _run_report(task_dir: Path | None = None, preview: bool = False) -> dict:
 
     subject, html_body, text_body = _render_report(data, env, owner=None)
     html_path, txt_path = _write_report_files('Daily_CodeSonar_Report', html_body, text_body)
+    _mirror_dashboard_preview(task_dir)
     rows = [
         {'output': f'Generated management report: {html_path}'},
         {'output': f'Generated plain text fallback: {txt_path}'},
@@ -549,7 +578,7 @@ def _run_report(task_dir: Path | None = None, preview: bool = False) -> dict:
     if preview:
         _append_log('management', mode, 'generated', [], '')
         for owner_name in owner_map:
-            owner_subject, owner_html, owner_text = _render_report(data, env, owner=owner_name)
+            owner_subject, owner_html, owner_text = _render_report(data, env, owner=owner_name, link_base='../../')
             owner_dir = EMAIL_DIR / 'owners' / _slug(owner_name)
             owner_dir.mkdir(parents=True, exist_ok=True)
             (owner_dir / 'Daily_CodeSonar_Report.html').write_text(owner_html, encoding='utf-8')
@@ -575,7 +604,7 @@ def _run_report(task_dir: Path | None = None, preview: bool = False) -> dict:
 
     for owner_name, owner_email in owner_map.items():
         try:
-            owner_subject, owner_html, owner_text = _render_report(data, env, owner=owner_name)
+            owner_subject, owner_html, owner_text = _render_report(data, env, owner=owner_name, link_base='../../')
             owner_dir = EMAIL_DIR / 'owners' / _slug(owner_name)
             owner_dir.mkdir(parents=True, exist_ok=True)
             (owner_dir / 'Daily_CodeSonar_Report.html').write_text(owner_html, encoding='utf-8')
@@ -607,4 +636,190 @@ def daily_code_sonar_report(task_dir: Path | None = None) -> dict:
     answer = result.get("answer", "")
     if answer.startswith("Daily CodeSonar report preview generated:"):
         result["answer"] = answer.replace("Daily CodeSonar report preview generated:", "Daily CodeSonar report generated:", 1)
+    return result
+
+
+def _smtp_config(env: dict[str, str]) -> dict[str, str | list[str] | bool]:
+    backend = _env('EMAIL_BACKEND', env, 'smtp').strip().lower() or 'smtp'
+    return {
+        'backend': backend,
+        'host': _env('SMTP_HOST', env, '').strip(),
+        'port': _env('SMTP_PORT', env, '').strip(),
+        'username': _env('SMTP_USERNAME', env, '').strip(),
+        'password': _env('SMTP_PASSWORD', env, '').strip(),
+        'use_tls': _bool('SMTP_USE_TLS', env, True),
+        'from': _env('EMAIL_FROM', env, '').strip(),
+        'to': _list('EMAIL_TO', env),
+        'cc': _list('EMAIL_CC', env),
+    }
+
+
+def _validate_send_config(config: dict[str, str | list[str] | bool]) -> list[str]:
+    issues: list[str] = []
+    if config['backend'] != 'smtp':
+        issues.append('EMAIL_BACKEND must be smtp.')
+    if not config['host']:
+        issues.append('SMTP_HOST is not configured.')
+    if not config['port']:
+        issues.append('SMTP_PORT is not configured.')
+    if not config['from']:
+        issues.append('EMAIL_FROM is not configured.')
+    if not config['to']:
+        issues.append('EMAIL_TO is not configured.')
+    if not config['cc']:
+        issues.append('EMAIL_CC is not configured.')
+    if bool(config['username']) ^ bool(config['password']):
+        issues.append('SMTP_USERNAME and SMTP_PASSWORD must both be set or both be empty.')
+    return issues
+
+
+def _attachment_candidates(task_dir: Path, html_path: Path, txt_path: Path) -> list[Path]:
+    attachments = [html_path, txt_path]
+    for candidate in [
+        task_dir / 'output' / 'Master_Tracker.xlsx',
+        task_dir / 'output' / 'Tracker_History.xlsx',
+    ]:
+        if candidate.exists():
+            attachments.append(candidate)
+    return attachments
+
+
+def _attachment_bytes(path: Path) -> tuple[str, str, bytes]:
+    mimetype, _ = mimetypes.guess_type(str(path))
+    if mimetype:
+        maintype, subtype = mimetype.split('/', 1)
+    else:
+        maintype, subtype = 'application', 'octet-stream'
+    return maintype, subtype, path.read_bytes()
+
+
+def _send_smtp_email(config: dict[str, str | list[str] | bool], subject: str, html_path: Path, txt_path: Path, attachments: list[Path]) -> dict:
+    port = int(str(config['port']))
+    recipients = list(dict.fromkeys([*(config['to'] or []), *(config['cc'] or [])]))
+    if not recipients:
+        raise RuntimeError('No SMTP recipients were configured.')
+
+    message = EmailMessage()
+    message['Subject'] = subject
+    message['From'] = str(config['from'])
+    message['To'] = ';'.join(str(item) for item in config['to'])
+    if config['cc']:
+        message['Cc'] = ';'.join(str(item) for item in config['cc'])
+
+    text_body = txt_path.read_text(encoding='utf-8') if txt_path.exists() else 'Daily CodeSonar report is attached.'
+    html_body = html_path.read_text(encoding='utf-8')
+    message.set_content(text_body)
+    message.add_alternative(html_body, subtype='html')
+
+    for attachment in attachments:
+        if not attachment.exists():
+            continue
+        maintype, subtype, data = _attachment_bytes(attachment)
+        message.add_attachment(data, maintype=maintype, subtype=subtype, filename=attachment.name)
+
+    if port == 465:
+        smtp_client = smtplib.SMTP_SSL(str(config['host']), port, timeout=30)
+    else:
+        smtp_client = smtplib.SMTP(str(config['host']), port, timeout=30)
+
+    with smtp_client as smtp:
+        smtp.ehlo()
+        if port != 465 and bool(config['use_tls']):
+            smtp.starttls()
+            smtp.ehlo()
+        if config['username'] or config['password']:
+            smtp.login(str(config['username']), str(config['password']))
+        smtp.send_message(message, from_addr=str(config['from']), to_addrs=recipients)
+
+    return {
+        'recipient_count': len(recipients),
+        'recipients': recipients,
+    }
+
+
+def _run_report(task_dir: Path | None = None, preview: bool = False, display: bool = False) -> dict:
+    task_dir = Path(task_dir) if task_dir else TASK_DIR
+    tracker_path = task_dir / 'output' / 'Master_Tracker.xlsx'
+    mode = 'preview' if preview else ('display' if display else 'send')
+    if not tracker_path.exists():
+        message = f'Master_Tracker.xlsx not found at {tracker_path}. Run Update Tracker first.'
+        _append_log('management', mode, 'error', [], message)
+        return {'answer': message, 'count': 0, 'rows': []}
+
+    try:
+        data = _load_dashboard_data(task_dir)
+    except Exception as exc:
+        message = str(exc)
+        _append_log('management', mode, 'error', [], message)
+        return {'answer': message, 'count': 0, 'rows': []}
+
+    owner_validation = data.get('owner_validation') or {}
+    if not owner_validation.get('reconciled', False) or owner_validation.get('warnings'):
+        warnings = owner_validation.get('warnings', [])
+        message = 'Owner validation failed; email report was not generated.'
+        _append_log('management', mode, 'error', [], message)
+        return {'answer': message, 'count': 0, 'rows': [{'warning': warning} for warning in warnings]}
+
+    env = _load_env(ENV_FILE)
+    config = _smtp_config(env)
+
+    try:
+        subject, html_body, text_body = _render_report(data, env, owner=None)
+    except Exception as exc:
+        message = str(exc)
+        _append_log('management', mode, 'error', list(config['to']) + list(config['cc']), message)
+        return {'answer': message, 'count': 0, 'rows': []}
+
+    html_path, txt_path = _write_report_files('Daily_CodeSonar_Report', html_body, text_body)
+    _mirror_dashboard_preview(task_dir)
+    rows = [
+        {'output': f'Generated management report: {html_path}'},
+        {'output': f'Generated plain text fallback: {txt_path}'},
+        {'output': f"To recipients: {', '.join(config['to']) if config['to'] else '(none)'}"},
+        {'output': f"CC: {', '.join(config['cc']) if config['cc'] else '(none)'}"},
+    ]
+
+    if preview or display or config.get('backend') == 'preview':
+        _append_log('management', mode, 'generated', list(config['to']) + list(config['cc']), '')
+        return {'answer': f'Daily CodeSonar report preview generated: {html_path}', 'count': len(rows), 'rows': rows}
+
+    issues = _validate_send_config(config)
+    if issues:
+        message = 'SMTP configuration is incomplete: ' + '; '.join(issues)
+        _append_log('management', mode, 'error', list(config['to']) + list(config['cc']), message)
+        rows.extend({'warning': issue} for issue in issues)
+        return {'answer': message, 'count': len(rows), 'rows': rows}
+
+    try:
+        send_result = _send_smtp_email(config, subject, html_path, txt_path, _attachment_candidates(task_dir, html_path, txt_path))
+        sent_at = datetime.now().isoformat(timespec='seconds')
+        _append_log('management', mode, 'sent', send_result['recipients'], '')
+        rows.append({'output': f"Sent SMTP email to {send_result['recipient_count']} recipient(s) at {sent_at}"})
+        rows.append({'output': f"To: {', '.join(config['to'])}"})
+        rows.append({'output': f"CC: {', '.join(config['cc'])}"})
+        return {
+            'answer': f'Daily CodeSonar report sent successfully to {send_result["recipient_count"]} recipient(s) at {sent_at}.',
+            'count': len(rows),
+            'rows': rows,
+        }
+    except Exception as exc:
+        message = f'Failed to send SMTP email: {exc}'
+        _append_log('management', mode, 'error', list(config['to']) + list(config['cc']), message)
+        rows.append({'error': message})
+        return {'answer': message, 'count': len(rows), 'rows': rows}
+
+
+def preview_daily_code_sonar_report(task_dir: Path | None = None) -> dict:
+    return _run_report(task_dir=task_dir, preview=True)
+
+
+def send_daily_code_sonar_report(task_dir: Path | None = None, display: bool = False) -> dict:
+    return _run_report(task_dir=task_dir, preview=False, display=display)
+
+
+def daily_code_sonar_report(task_dir: Path | None = None) -> dict:
+    result = preview_daily_code_sonar_report(task_dir)
+    answer = result.get('answer', '')
+    if answer.startswith('Daily CodeSonar report preview generated:'):
+        result['answer'] = answer.replace('Daily CodeSonar report preview generated:', 'Daily CodeSonar report generated:', 1)
     return result
