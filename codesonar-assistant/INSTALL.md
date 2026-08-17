@@ -49,10 +49,10 @@ Required values for daily email reports:
 - `SMTP_PASSWORD`
 - `SMTP_USE_TLS`
 - `EMAIL_FROM`
-- `EMAIL_TO`
+- `EMAIL_OWNERS`
 - `EMAIL_CC`
 
-`EMAIL_TO` is the consolidated recipient list for owners/reviewers. `EMAIL_CC` is the team/group email.
+`EMAIL_OWNERS` is the consolidated recipient list for owners/reviewers. `EMAIL_CC` is the team/group email.
 
 ## 5. SMTP Prerequisites
 
@@ -93,7 +93,7 @@ You can also ask the assistant:
 
 ## 7. Task Scheduler
 
-Use Windows Task Scheduler to run the daily send command on a schedule.
+Use Windows Task Scheduler to run the daily workflow on a schedule.
 
 Example action:
 
@@ -106,6 +106,7 @@ Recommended schedule:
 
 - Trigger: daily at the desired report time
 - Run only when user is logged on if the environment or file access depends on the desktop session
+- The scheduled workflow is: CodeSonar daily workflow -> latest CodeSonar analysis -> tracker update -> dashboard generation -> HTML email report -> SMTP send
 
 ## 8. Notes
 

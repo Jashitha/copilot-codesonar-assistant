@@ -5,7 +5,7 @@ CodeSonar Assistant is a project-generic AI-powered GitHub Copilot agent for Cod
 - Offline mode using an exported CodeSonar CSV or an existing tracker
 - Live mode by connecting to a CodeSonar server through configurable `.env` settings
 
-Point it at your own project and it will download the latest report, update the tracker, generate dashboards, preserve assignments, auto-fix safe source patterns, and answer natural language queries about CodeSonar findings.
+Point it at your own project and it will download the latest report, update the tracker, generate interactive dashboards, preserve assignments, auto-fix safe source patterns, generate the daily HTML email report, and answer natural language queries about CodeSonar findings.
 
 ## 🚀 What's New in v2.0
 
@@ -24,6 +24,8 @@ Point it at your own project and it will download the latest report, update the 
 - CSV Export
 - Print Dashboard
 - Dashboard automatically generated after Update Tracker
+- Daily HTML email report via SMTP
+- Consolidated owner recipient list and team CC
 
 ## Download The Whole Project
 
@@ -116,15 +118,17 @@ A normal developer workflow looks like this:
 
 ```mermaid
 flowchart TD
-    A[Update Tracker] --> B[Download Latest Report]
-    B --> C[Update Master Tracker]
-    C --> D[Generate Reports]
-    D --> E[Generate Interactive Dashboard]
-    E --> F[Dashboard]
-    F --> G[Pre-Commit Review]
-    G --> H[Auto Fix]
-    H --> I[Commit]
-    I --> J[Gerrit Patchset Review]
+    A[CodeSonar daily workflow] --> B[Download Latest Report]
+    B --> C[Filter HB_PRIO_1 / HB_PRIO_2]
+    C --> D[Update Master Tracker]
+    D --> E[Preserve / Assign Owners]
+    E --> F[Generate Dashboard]
+    F --> G[Generate Daily HTML Email]
+    G --> H[Send via SMTP]
+    H --> I[Pre-Commit Review]
+    I --> J[Auto Fix]
+    J --> K[Commit]
+    K --> L[Gerrit Patchset Review]
 ```
 
 ## Common Prompts
@@ -203,6 +207,14 @@ The assistant will:
 - identify blocking findings
 - generate commit readiness
 - post `Verified +1` or `Verified -1`
+
+## Daily Email Reports
+
+- `Preview Daily CodeSonar Report`
+- `Send Daily CodeSonar Report`
+- `Daily Email Report`
+
+The daily email workflow uses SMTP, the generated `output/email/Daily_CodeSonar_Report.html` file as the body, `EMAIL_OWNERS` for the To recipients, and `EMAIL_CC` for the team/group CC.
 
 ### Not Sure What to Use?
 

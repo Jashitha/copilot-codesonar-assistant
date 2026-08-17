@@ -23,11 +23,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help='Generate the email artifacts without sending mail',
     )
     parser.add_argument(
-        '--display',
-        action='store_true',
-        help='Open the Outlook draft instead of sending it',
-    )
-    parser.add_argument(
         '--task-dir',
         default=str(TASK_DIR),
         help='Workspace root that contains output/Master_Tracker.xlsx',
@@ -48,7 +43,7 @@ def main() -> int:
     if args.preview:
         result = preview_daily_code_sonar_report(task_dir)
     else:
-        result = send_daily_code_sonar_report(task_dir, display=args.display)
+        result = send_daily_code_sonar_report(task_dir)
 
     payload = {
         'source': str(task_dir / 'output' / 'Master_Tracker.xlsx'),

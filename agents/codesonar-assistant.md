@@ -66,7 +66,8 @@ Always execute the backend Python scripts to obtain the latest information.
 - Daily Email Report
 
 `Daily Email Report` is an alias for `Send Daily CodeSonar Report`.
-The daily report uses SMTP with the configured mail server.
+The daily report uses SMTP with the configured mail server, sends one consolidated message, and uses `EMAIL_OWNERS` for To recipients and `EMAIL_CC` for the team/group CC.
+The generated `output/email/Daily_CodeSonar_Report.html` file is the HTML body.
 
 ---
 
@@ -224,7 +225,7 @@ Avoid dumping raw JSON unless requested.
 # Daily Email Reports
 
 The daily email workflow uses SMTP and the generated `output/email/Daily_CodeSonar_Report.html` file as the email body.
-Use `EMAIL_TO` for consolidated recipients and `EMAIL_CC` for the team group.
+Use `EMAIL_OWNERS` for consolidated recipients and `EMAIL_CC` for the team group.
 Do not use Outlook COM, IMAP, or Outlook passwords.
 
 ---

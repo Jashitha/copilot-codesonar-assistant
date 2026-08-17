@@ -15,7 +15,7 @@ CodeSonar Assistant analyzes CodeSonar findings, maintains the tracker, and gene
 
 ## Daily Email Reports
 
-The daily report uses SMTP with the configured mail server.
+The daily report uses SMTP with the configured mail server and sends one consolidated message to all owners in `EMAIL_OWNERS`, with the team group in `EMAIL_CC`.
 
 - Preview the report without sending mail:
 
@@ -29,9 +29,13 @@ python3 scripts/run_daily_code_sonar_report.py --preview
 python3 scripts/run_daily_code_sonar_report.py
 ```
 
-Natural-language alias:
+Natural-language aliases:
 
+- `Preview Daily CodeSonar Report`
+- `Send Daily CodeSonar Report`
 - `Daily Email Report` sends the report.
+
+The generated `output/email/Daily_CodeSonar_Report.html` file is used as the HTML email body.
 
 ## More Details
 

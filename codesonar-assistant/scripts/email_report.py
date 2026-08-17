@@ -353,15 +353,14 @@ def _render_report(data: dict, env: dict[str, str], owner: str | None = None, li
         owner_rows = _owner_rows(data, owner)
         if not owner_rows:
             raise ValueError(f"Owner '{owner}' not found in dashboard data.")
-        owner_row = owner_rows[0]
-        subject = f"Daily CodeSonar Report | {owner} | {analysis_display}"
+        subject = f"Daily CodeSonar Report - {project_name} - {analysis_display}"
         hotspots = _top_hotspots(data, owner=owner)
         action_findings = _top_action_findings(data, owner=owner)
         quick_links = _quick_links(env, owner, link_base=link_base)
         owner_caption = f'{owner} receives only assigned findings.'
         action_title = 'Highest-Priority Findings'
     else:
-        subject = f"Daily CodeSonar Report | {project_name} | {analysis_display}"
+        subject = f"Daily CodeSonar Report - {project_name} - {analysis_display}"
         hotspots = _top_hotspots(data)
         action_findings = _top_action_findings(data)
         quick_links = _quick_links(env, None, link_base=link_base)
@@ -565,7 +564,6 @@ def _run_report(task_dir: Path | None = None, preview: bool = False) -> dict:
 
     env = _load_env(ENV_FILE)
     config = _smtp_config(env)
-    owner_map = _owner_email_map(env)
 
     subject, html_body, text_body = _render_report(data, env, owner=None)
     html_path, txt_path = _write_report_files('Daily_CodeSonar_Report', html_body, text_body)
@@ -573,54 +571,37 @@ def _run_report(task_dir: Path | None = None, preview: bool = False) -> dict:
     rows = [
         {'output': f'Generated management report: {html_path}'},
         {'output': f'Generated plain text fallback: {txt_path}'},
+        {'output': f"To recipients: {', '.join(config['to']) if config['to'] else '(none)'}"},
+        {'output': f"CC: {', '.join(config['cc']) if config['cc'] else '(none)'}"},
     ]
 
-    if preview:
-        _append_log('management', mode, 'generated', [], '')
-        for owner_name in owner_map:
-            owner_subject, owner_html, owner_text = _render_report(data, env, owner=owner_name, link_base='../../')
-            owner_dir = EMAIL_DIR / 'owners' / _slug(owner_name)
-            owner_dir.mkdir(parents=True, exist_ok=True)
-            (owner_dir / 'Daily_CodeSonar_Report.html').write_text(owner_html, encoding='utf-8')
-            (owner_dir / 'Daily_CodeSonar_Report.txt').write_text(owner_text, encoding='utf-8')
-            _append_log(owner_name, mode, 'generated', [owner_map[owner_name]], '')
-            rows.append({'output': f'Generated owner report preview: {owner_name} -> {owner_dir}'})
+    if preview or config.get('backend') == 'preview':
+        _append_log('management', mode, 'generated', list(config['to']) + list(config['cc']), '')
         return {'answer': f'Daily CodeSonar report preview generated: {html_path}', 'count': len(rows), 'rows': rows}
 
     issues = _validate_send_config(config)
     if issues:
-        message = 'Email configuration is incomplete: ' + '; '.join(issues)
-        _append_log('management', mode, 'error', list(config['to']), message)
+        message = 'SMTP configuration is incomplete: ' + '; '.join(issues)
+        _append_log('management', mode, 'error', list(config['to']) + list(config['cc']), message)
         return {'answer': message, 'count': 0, 'rows': rows}
 
     try:
-        _send_email(config, subject, html_body, text_body)
-        _append_log('management', mode, 'sent', list(config['to']) + list(config['cc']) + list(config['bcc']), '')
-        rows.append({'output': f"Sent management email to: {', '.join(config['to'])}"})
+        send_result = _send_smtp_email(config, subject, html_path, txt_path, _attachment_candidates(task_dir, html_path, txt_path))
+        sent_at = datetime.now().isoformat(timespec='seconds')
+        _append_log('management', mode, 'sent', send_result['recipients'], '')
+        rows.append({'output': f"Sent SMTP email to {send_result['recipient_count']} recipient(s) at {sent_at}"})
+        rows.append({'output': f"To: {', '.join(config['to'])}"})
+        rows.append({'output': f"CC: {', '.join(config['cc'])}"})
     except Exception as exc:
-        message = f'Failed to send management email: {exc}'
-        _append_log('management', mode, 'error', list(config['to']), message)
+        message = f'Failed to send SMTP email: {exc}'
+        _append_log('management', mode, 'error', list(config['to']) + list(config['cc']), message)
         return {'answer': message, 'count': 0, 'rows': rows}
 
-    for owner_name, owner_email in owner_map.items():
-        try:
-            owner_subject, owner_html, owner_text = _render_report(data, env, owner=owner_name, link_base='../../')
-            owner_dir = EMAIL_DIR / 'owners' / _slug(owner_name)
-            owner_dir.mkdir(parents=True, exist_ok=True)
-            (owner_dir / 'Daily_CodeSonar_Report.html').write_text(owner_html, encoding='utf-8')
-            (owner_dir / 'Daily_CodeSonar_Report.txt').write_text(owner_text, encoding='utf-8')
-            owner_config = dict(config)
-            owner_config['to'] = [owner_email]
-            owner_config['cc'] = []
-            owner_config['bcc'] = []
-            _send_email(owner_config, owner_subject, owner_html, owner_text)
-            _append_log(owner_name, mode, 'sent', [owner_email], '')
-            rows.append({'output': f'Sent owner email: {owner_name} -> {owner_email}'})
-        except Exception as exc:
-            _append_log(owner_name, mode, 'error', [owner_email], str(exc))
-            rows.append({'error': f'Owner email failed for {owner_name}: {exc}'})
-
-    return {'answer': f'Daily CodeSonar report sent successfully: {html_path}', 'count': len(rows), 'rows': rows}
+    return {
+        'answer': f"Daily CodeSonar report sent successfully to {send_result['recipient_count']} recipient(s).",
+        'count': len(rows),
+        'rows': rows,
+    }
 
 
 def preview_daily_code_sonar_report(task_dir: Path | None = None) -> dict:
@@ -649,7 +630,7 @@ def _smtp_config(env: dict[str, str]) -> dict[str, str | list[str] | bool]:
         'password': _env('SMTP_PASSWORD', env, '').strip(),
         'use_tls': _bool('SMTP_USE_TLS', env, True),
         'from': _env('EMAIL_FROM', env, '').strip(),
-        'to': _list('EMAIL_TO', env),
+        'to': _list('EMAIL_OWNERS', env) or _list('EMAIL_TO', env),
         'cc': _list('EMAIL_CC', env),
     }
 
@@ -665,7 +646,7 @@ def _validate_send_config(config: dict[str, str | list[str] | bool]) -> list[str
     if not config['from']:
         issues.append('EMAIL_FROM is not configured.')
     if not config['to']:
-        issues.append('EMAIL_TO is not configured.')
+        issues.append('EMAIL_OWNERS is not configured.')
     if not config['cc']:
         issues.append('EMAIL_CC is not configured.')
     if bool(config['username']) ^ bool(config['password']):
@@ -702,9 +683,9 @@ def _send_smtp_email(config: dict[str, str | list[str] | bool], subject: str, ht
     message = EmailMessage()
     message['Subject'] = subject
     message['From'] = str(config['from'])
-    message['To'] = ';'.join(str(item) for item in config['to'])
+    message['To'] = ', '.join(str(item) for item in config['to'])
     if config['cc']:
-        message['Cc'] = ';'.join(str(item) for item in config['cc'])
+        message['Cc'] = ', '.join(str(item) for item in config['cc'])
 
     text_body = txt_path.read_text(encoding='utf-8') if txt_path.exists() else 'Daily CodeSonar report is attached.'
     html_body = html_path.read_text(encoding='utf-8')
